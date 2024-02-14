@@ -306,14 +306,9 @@ namespace sql
 
 	std::string get_json_response(const std::string& dbname, const std::string &sql, const std::vector<std::string> &varNames, const std::string &prefixName) 
 	{
-		return db_exec<std::string>(dbname, sql, [&varNames, &prefixName](SQLHSTMT hstmt) {
-			std::string json; 
-			json.reserve(16383);
+		
+		auto _loop = [&varNames](const SQLHSTMT& hstmt, std::string& json) {
 			int rowsetCounter{0};
-			json.append(R"({"status":"OK",)");
-			json.append("\"");
-			json.append(prefixName);
-			json.append("\":{");
 			do {
 				json.append( "\"");
 				json.append(varNames[rowsetCounter]);
@@ -322,6 +317,16 @@ namespace sql
 				json.append(",");
 				++rowsetCounter;
 			} while (SQLMoreResults(hstmt) == SQL_SUCCESS);
+		};
+		
+		return db_exec<std::string>(dbname, sql, [&_loop, &varNames, &prefixName](SQLHSTMT hstmt) {
+			std::string json; 
+			json.reserve(16383);
+			json.append(R"({"status":"OK",)");
+			json.append("\"");
+			json.append(prefixName);
+			json.append("\":{");
+			_loop(hstmt, json);
 			json.pop_back(); //remove last coma ","
 			json.append("}}");
 			SQLFreeStmt(hstmt, SQL_CLOSE);
