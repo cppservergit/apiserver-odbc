@@ -8,9 +8,7 @@ namespace
 	std::pair<std::string, std::string> get_error_msg(SQLHENV henv, SQLHDBC hdbc, SQLHSTMT hstmt) noexcept
 	{
 	    std::array<SQLCHAR, 10> szSQLSTATE;
-		//unsigned char szSQLSTATE[10];
 	    SDWORD nErr;
-	    //unsigned char msg[SQL_MAX_MESSAGE_LENGTH + 1];
 		std::array<SQLCHAR, SQL_MAX_MESSAGE_LENGTH + 1> msg;
 	    SWORD cbmsg;
 	    SQLError(henv, hdbc, hstmt, szSQLSTATE.data(), &nErr, msg.data(), msg.size(), &cbmsg);
@@ -58,6 +56,7 @@ namespace
 		return cols;
 	}
 
+/*
 	struct dbconn {
 		SQLHENV henv = SQL_NULL_HENV;
 		SQLHDBC hdbc = SQL_NULL_HDBC;
@@ -77,6 +76,7 @@ namespace
 			delete conn;
 		}
 	}
+*/
 
 	struct dbutil 
 	{
@@ -85,12 +85,12 @@ namespace
 		SQLHENV henv = SQL_NULL_HENV;
 		SQLHDBC hdbc = SQL_NULL_HDBC;
 		SQLHSTMT hstmt = SQL_NULL_HSTMT;
-		std::unique_ptr<dbconn, decltype(&dbclose)> conn;
+		std::unique_ptr<dbconn> conn;
 				
-		dbutil(): conn{nullptr, &dbclose} {}
+		dbutil(): conn{nullptr} {}
 	
 		explicit dbutil(std::string_view _name, std::string_view _connstr) noexcept: 
-		name{_name}, dbconnstr{_connstr}, conn{new dbconn, &dbclose}
+		name{_name}, dbconnstr{_connstr}, conn{std::make_unique<dbconn>()}
 		{
 			connect();
 		}
@@ -118,7 +118,7 @@ namespace
 			RETCODE rc {SQL_SUCCESS};
 			rc = SQLAllocHandle ( SQL_HANDLE_ENV, SQL_NULL_HANDLE, &henv );
 			if ( rc != SQL_SUCCESS ) {
-				logger::log(LOGGER_SRC, "error", "SQLAllocHandle failed");
+				logger::log(LOGGER_SRC, "error", "SQLAllocHandle for henv failed");
 			}
 
 			rc = SQLSetEnvAttr(henv, SQL_ATTR_ODBC_VERSION, (SQLPOINTER)SQL_OV_ODBC3 , 0 );
@@ -126,11 +126,14 @@ namespace
 				logger::log(LOGGER_SRC, "error", "SQLSetEnvAttr failed to set ODBC version");
 			}
 
-			SQLCHAR* dsn = (SQLCHAR*)dbconnstr.c_str();
+			auto dsn = (SQLCHAR*)dbconnstr.c_str();
 			SQLSMALLINT bufflen;
 			rc = SQLAllocHandle (SQL_HANDLE_DBC, henv, &hdbc);
+			if ( rc != SQL_SUCCESS ) {
+				logger::log(LOGGER_SRC, "error", "SQLAllocHandle for hdbc failed");
+			}
 		
-			rc = SQLDriverConnect(hdbc, NULL, dsn, SQL_NTS, NULL, 0, &bufflen, SQL_DRIVER_NOPROMPT);
+			rc = SQLDriverConnect(hdbc, nullptr, dsn, SQL_NTS, nullptr, 0, &bufflen, SQL_DRIVER_NOPROMPT);
 			if (rc!=SQL_SUCCESS && rc!=SQL_SUCCESS_WITH_INFO) {
 				auto [error, sqlstate] {get_error_msg(henv, hdbc, hstmt)};
 				logger::log(LOGGER_SRC, "error", std::format("SQLDriverConnect failed: {}", error));

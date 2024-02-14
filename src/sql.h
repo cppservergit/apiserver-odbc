@@ -25,6 +25,7 @@
 #include "util.h"
 #include "logger.h"
 #include "env.h"
+#include "odbcutil.h"
 
 namespace sql
 {
