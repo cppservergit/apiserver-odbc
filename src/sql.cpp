@@ -136,7 +136,7 @@ namespace
 		SQLSMALLINT numCols ;
 		SQLNumResultCols( hstmt, &numCols );
 		
-		auto _loop = [&hstmt, &numCols, &rs](auto& cols) {
+		auto _loop = [&numCols, &rs](auto& cols) {
 			sql::record rec;
 			rec.reserve( numCols );
 			for ( auto& col: cols ) {
@@ -162,23 +162,28 @@ namespace
 		json.append("[");
 		SQLSMALLINT numCols{0};
 		SQLNumResultCols( hstmt, &numCols );
+		
+		auto _loop = [&json](auto& cols) {
+			for (auto& col: cols) {
+				json.append("\"").append(col.colname).append("\":");
+				if ( col.dataSize > 0 ) {
+					if (col.dataType==SQL_TYPE_DATE || col.dataType==SQL_VARCHAR || col.dataType==SQL_WVARCHAR || col.dataType==SQL_CHAR) {
+						json.append("\"").append(  std::bit_cast<char*>(&col.data[0]) ).append("\"");
+					} else {
+						json.append( std::bit_cast<char*>(&col.data[0]) );
+					}
+				} else {
+					json.append("\"\"");
+				}
+				json.append(",");
+			}
+		};
+		
 		if (numCols > 0) {
 			auto cols = bind_cols( hstmt, numCols );
 			while (SQLFetch(hstmt)!=SQL_NO_DATA) {
 				json.append("{");
-				for (auto& col: cols) {
-					json.append("\"").append(col.colname).append("\":");
-					if ( col.dataSize > 0 ) {
-						if (col.dataType==SQL_TYPE_DATE || col.dataType==SQL_VARCHAR || col.dataType==SQL_WVARCHAR || col.dataType==SQL_CHAR) {
-							json.append("\"").append(  std::bit_cast<char*>(&col.data[0]) ).append("\"");
-						} else {
-							json.append( std::bit_cast<char*>(&col.data[0]) );
-						}
-					} else {
-						json.append("\"\"");
-					}
-					json.append(",");
-				}
+				_loop(cols);
 				json.pop_back();
 				json.append("},");
 			}
