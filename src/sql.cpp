@@ -135,19 +135,24 @@ namespace
 		sql::recordset rs;
 		SQLSMALLINT numCols ;
 		SQLNumResultCols( hstmt, &numCols );
+		
+		auto _loop = [&hstmt, &numCols, &rs](auto& cols) {
+			sql::record rec;
+			rec.reserve( numCols );
+			for ( auto& col: cols ) {
+				if (col.dataSize > 0) {
+					rec.try_emplace(col.colname, std::bit_cast<char*>(&col.data[0]));
+				} else {
+					rec.try_emplace(col.colname, "");
+				}
+			}
+			rs.push_back(rec);			
+		};
+		
 		if (numCols>0) {
 			auto cols = bind_cols( hstmt, numCols );
-			while ( SQLFetch( hstmt )!=SQL_NO_DATA ) {
-				sql::record rec;
-				rec.reserve( numCols );
-				for ( auto& col: cols ) {
-					if (col.dataSize > 0) {
-						rec.try_emplace(col.colname, std::bit_cast<char*>(&col.data[0]));
-					} else {
-						rec.try_emplace(col.colname, "");
-					}
-				}
-				rs.push_back(rec);
+			while ( SQLFetch( hstmt ) != SQL_NO_DATA ) {
+				_loop(cols);
 			}
 		}
 		return rs;
