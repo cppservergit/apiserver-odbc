@@ -39,14 +39,17 @@ namespace
 		cols.reserve( numCols );
 
 		for (int i = 0; i < numCols; i++) {
-			SQLCHAR colname[50];
-			SQLSMALLINT NameLength, dataType, DecimalDigits, Nullable;
-			SQLULEN ColumnSize;
-			SQLLEN displaySize;
-			SQLDescribeCol(hstmt, i + 1, colname, sizeof(colname), &NameLength, &dataType, &ColumnSize, &DecimalDigits, &Nullable);
-			SQLColAttribute(hstmt, i + 1, SQL_DESC_DISPLAY_SIZE, NULL, 0, NULL, &displaySize);
+			std::array<SQLCHAR, 50> colname;
+			SQLSMALLINT NameLength{0}; 
+			SQLSMALLINT dataType{0};
+			SQLSMALLINT DecimalDigits{0};
+			SQLSMALLINT Nullable{0};
+			SQLULEN ColumnSize{0};
+			SQLLEN displaySize{0};
+			SQLDescribeCol(hstmt, i + 1, colname.data(), colname.size(), &NameLength, &dataType, &ColumnSize, &DecimalDigits, &Nullable);
+			SQLColAttribute(hstmt, i + 1, SQL_DESC_DISPLAY_SIZE, nullptr, 0, nullptr, &displaySize);
 			displaySize++;
-			col_info& col = cols.emplace_back( reinterpret_cast<char*>(colname), dataType, displaySize );
+			col_info& col = cols.emplace_back(reinterpret_cast<char*>(colname.data()), dataType, displaySize);
 			SQLBindCol(hstmt, i + 1, SQL_C_CHAR, &col.data[0], col.dataBufferSize, &col.dataSize);
 		}
 		
