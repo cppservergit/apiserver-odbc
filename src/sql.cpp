@@ -7,13 +7,15 @@ namespace
 	
 	std::pair<std::string, std::string> get_error_msg(SQLHENV henv, SQLHDBC hdbc, SQLHSTMT hstmt) noexcept
 	{
-	    unsigned char szSQLSTATE[10];
+	    std::array<SQLCHAR, 10> szSQLSTATE;
+		//unsigned char szSQLSTATE[10];
 	    SDWORD nErr;
-	    unsigned char msg[SQL_MAX_MESSAGE_LENGTH + 1];
+	    //unsigned char msg[SQL_MAX_MESSAGE_LENGTH + 1];
+		std::array<SQLCHAR, SQL_MAX_MESSAGE_LENGTH + 1> msg;
 	    SWORD cbmsg;
-	    SQLError(henv, hdbc, hstmt, szSQLSTATE, &nErr, msg, sizeof(msg), &cbmsg);
-		const std::string sqlState {reinterpret_cast< char const* >(szSQLSTATE)};
-		const std::string sqlErrorMsg {reinterpret_cast< char const* >(msg)};
+	    SQLError(henv, hdbc, hstmt, szSQLSTATE.data(), &nErr, msg.data(), msg.size(), &cbmsg);
+		const std::string sqlState {std::bit_cast<char*>(szSQLSTATE.data())};
+		const std::string sqlErrorMsg {std::bit_cast<char*>(msg.data())};
 		return std::make_pair(sqlErrorMsg, sqlState);
 	}
 
@@ -49,7 +51,7 @@ namespace
 			SQLDescribeCol(hstmt, i + 1, colname.data(), colname.size(), &NameLength, &dataType, &ColumnSize, &DecimalDigits, &Nullable);
 			SQLColAttribute(hstmt, i + 1, SQL_DESC_DISPLAY_SIZE, nullptr, 0, nullptr, &displaySize);
 			displaySize++;
-			col_info& col = cols.emplace_back(reinterpret_cast<char*>(colname.data()), dataType, displaySize);
+			col_info& col = cols.emplace_back(std::bit_cast<char*>(colname.data()), dataType, displaySize);
 			SQLBindCol(hstmt, i + 1, SQL_C_CHAR, &col.data[0], col.dataBufferSize, &col.dataSize);
 		}
 		
@@ -159,7 +161,7 @@ namespace
 				rec.reserve( numCols );
 				for ( auto& col: cols ) {
 					if (col.dataSize > 0) {
-						rec.try_emplace(col.colname, reinterpret_cast<char*>(&col.data[0]));
+						rec.try_emplace(col.colname, std::bit_cast<char*>(&col.data[0]));
 					} else {
 						rec.try_emplace(col.colname, "");
 					}
@@ -182,9 +184,9 @@ namespace
 					json.append("\"").append(col.colname).append("\":");
 					if ( col.dataSize > 0 ) {
 						if (col.dataType==SQL_TYPE_DATE || col.dataType==SQL_VARCHAR || col.dataType==SQL_WVARCHAR || col.dataType==SQL_CHAR) {
-							json.append("\"").append(  reinterpret_cast<char const*>(&col.data[0]) ).append("\"");
+							json.append("\"").append(  std::bit_cast<char*>(&col.data[0]) ).append("\"");
 						} else {
-							json.append( reinterpret_cast<char const*>(&col.data[0]) );
+							json.append( std::bit_cast<char*>(&col.data[0]) );
 						}
 					} else {
 						json.append("\"\"");
