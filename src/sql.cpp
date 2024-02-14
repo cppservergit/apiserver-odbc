@@ -104,19 +104,19 @@ namespace
 				logger::log(LOGGER_SRC, "error", "SQLSetEnvAttr failed to set ODBC version");
 			}
 
-			auto dsn = (SQLCHAR*)dbconnstr.c_str();
+			auto dsn = (const SQLCHAR*)dbconnstr.c_str();
 			SQLSMALLINT bufflen;
 			rc = SQLAllocHandle (SQL_HANDLE_DBC, henv, &hdbc);
 			if ( rc != SQL_SUCCESS ) {
 				logger::log(LOGGER_SRC, "error", "SQLAllocHandle for hdbc failed");
 			}
 		
-			rc = SQLDriverConnect(hdbc, nullptr, dsn, SQL_NTS, nullptr, 0, &bufflen, SQL_DRIVER_NOPROMPT);
+			rc = SQLDriverConnect(hdbc, nullptr, (SQLCHAR*)dsn, SQL_NTS, nullptr, 0, &bufflen, SQL_DRIVER_NOPROMPT);
 			if (rc!=SQL_SUCCESS && rc!=SQL_SUCCESS_WITH_INFO) {
 				auto [error, sqlstate] {get_error_msg(henv, hdbc, hstmt)};
 				logger::log(LOGGER_SRC, "error", std::format("SQLDriverConnect failed: {}", error));
 			} else {
-				rc = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);	
+				SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);	
 				auto dbc = conn.get();
 				if (dbc) {
 					dbc->name = name;
@@ -242,13 +242,13 @@ namespace
 	template<typename T, class FN>
 	T db_exec(const std::string& dbname, const std::string& sql, FN func) 
 	{
-		auto sqlcmd = (SQLCHAR*)sql.c_str();
+		auto sqlcmd = (const SQLCHAR*)sql.c_str();
 		RETCODE rc {SQL_SUCCESS};
 		int retries {0};
 
 		while (true) {
 			auto& db = getdb(dbname);
-			rc = SQLExecDirect(db.hstmt, sqlcmd, SQL_NTS);
+			rc = SQLExecDirect(db.hstmt, (SQLCHAR*)sqlcmd, SQL_NTS);
 			if (rc != SQL_SUCCESS  && rc != SQL_NO_DATA)
 				retry(rc, dbname, db, retries, sql);
 			else 
