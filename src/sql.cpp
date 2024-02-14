@@ -24,7 +24,7 @@ namespace
 		SQLLEN dataSize{0};
 		std::vector<SQLCHAR> data;
 
-		col_info(std::string _colname, SQLSMALLINT _dataType, SQLLEN _dataBufferSize ):
+		col_info(const std::string& _colname, const SQLSMALLINT _dataType, const SQLLEN _dataBufferSize ):
 			colname{_colname},
 			dataType{_dataType},
 			dataBufferSize{_dataBufferSize}
@@ -33,7 +33,7 @@ namespace
 		};
 	};
 
-	inline std::vector<col_info> bind_cols(SQLHSTMT hstmt, SQLSMALLINT& numCols) {
+	inline std::vector<col_info> bind_cols(const SQLHSTMT& hstmt, const SQLSMALLINT& numCols) {
 		
 		std::vector<col_info> cols;
 		cols.reserve( numCols );
@@ -242,7 +242,7 @@ namespace
 	template<typename T, class FN>
 	T db_exec(const std::string& dbname, const std::string& sql, FN func) 
 	{
-		SQLCHAR* sqlcmd = (SQLCHAR*)sql.c_str();
+		auto sqlcmd = (SQLCHAR*)sql.c_str();
 		RETCODE rc {SQL_SUCCESS};
 		int retries {0};
 
