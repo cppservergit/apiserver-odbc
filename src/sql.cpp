@@ -56,28 +56,6 @@ namespace
 		return cols;
 	}
 
-/*
-	struct dbconn {
-		SQLHENV henv = SQL_NULL_HENV;
-		SQLHDBC hdbc = SQL_NULL_HDBC;
-		SQLHSTMT hstmt = SQL_NULL_HSTMT;
-		std::string name;
-	};
-
-	void dbclose(dbconn* conn) {
-		if (conn) {
-			if (conn->henv) {
-				SQLFreeHandle(SQL_HANDLE_STMT, conn->hstmt);
-				SQLDisconnect(conn->hdbc);
-				SQLFreeHandle(SQL_HANDLE_DBC, conn->hdbc);
-				SQLFreeHandle( SQL_HANDLE_ENV, conn->henv );
-			}
-			logger::log(LOGGER_SRC, "debug", std::format("closing odbc connection {:p} {}", static_cast<void*>(conn), conn->name));
-			delete conn;
-		}
-	}
-*/
-
 	struct dbutil 
 	{
 		std::string name;
