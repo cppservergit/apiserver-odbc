@@ -21,6 +21,7 @@
 #include <thread>
 #include <sstream>
 #include <iomanip>
+#include <format>
 #include <unordered_map>
 #include "util.h"
 #include "logger.h"
@@ -43,8 +44,9 @@ namespace sql
             std::string m_msg;
 	};
 	
-	std::string get_json_response(const std::string& dbname, const std::string &sql, bool useDataPrefix=true, const std::string &prefixName="data");
-	std::string get_json_response(const std::string& dbname, const std::string &sql, const std::vector<std::string> &varNames, const std::string &prefixName="data");
+	std::string get_json_response(const std::string& dbname, const std::string &sql);
+	std::string get_json_response_rs(const std::string& dbname, const std::string &sql, bool useDataPrefix=true, const std::string &prefixName="data");
+	std::string get_json_response_rs(const std::string& dbname, const std::string &sql, const std::vector<std::string> &varNames, const std::string &prefixName="data");
 	void exec_sql(const std::string& dbname, const std::string& sql);
 	bool has_rows(const std::string& dbname, const std::string &sql);
 	record get_record(const std::string& dbname, const std::string& sql);

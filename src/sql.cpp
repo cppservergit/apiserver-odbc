@@ -158,6 +158,24 @@ namespace
 		return rs;
 	}	
 
+	//retrieve json response from resultset
+	std::string read_json(SQLHSTMT hstmt) {
+		std::string json;
+		json.reserve(16383);
+		SQLLEN numRows{0};
+		SQLRowCount(hstmt, &numRows);
+		if (numRows) {
+			std::array<SQLCHAR, 8192> blob;
+			SQLLEN bytes_read{0};
+			while (SQLFetch(hstmt) != SQL_NO_DATA) {
+				SQLGetData(hstmt, 1, SQL_C_CHAR, blob.data(), blob.size(), &bytes_read);
+				json.append(std::bit_cast<char*>(blob.data()));
+			}
+		} else
+			json.append("null");
+		return json;
+	}
+
 	void get_json_array(SQLHSTMT hstmt, std::string &json) {
 		json.append("[");
 		SQLSMALLINT numCols{0};
@@ -294,7 +312,17 @@ namespace sql
 		});
 	}
 	
-	std::string get_json_response(const std::string& dbname, const std::string &sql, bool useDataPrefix, const std::string &prefixName)
+	std::string get_json_response(const std::string& dbname, const std::string &sql)
+	{
+		return db_exec<std::string>(dbname, sql, [](SQLHSTMT hstmt) {
+			std::string json {std::format(R"({{"status":"OK","data":{}}})", read_json(hstmt))};
+			SQLFreeStmt(hstmt, SQL_CLOSE);
+			SQLFreeStmt(hstmt, SQL_UNBIND);
+			return json;
+		});
+	}
+	
+	std::string get_json_response_rs(const std::string& dbname, const std::string &sql, bool useDataPrefix, const std::string &prefixName)
 	{
 		return db_exec<std::string>(dbname, sql, [useDataPrefix, &prefixName](SQLHSTMT hstmt) {
 			std::string json; 
@@ -314,7 +342,7 @@ namespace sql
 		});
 	}
 
-	std::string get_json_response(const std::string& dbname, const std::string &sql, const std::vector<std::string> &varNames, const std::string &prefixName) 
+	std::string get_json_response_rs(const std::string& dbname, const std::string &sql, const std::vector<std::string> &varNames, const std::string &prefixName) 
 	{
 		
 		auto _loop = [&varNames](const SQLHSTMT& hstmt, std::string& json) {
