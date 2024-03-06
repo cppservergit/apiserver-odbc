@@ -41,18 +41,18 @@ You can specify input rules (input parameters, optional), authorized roles (opti
 
 API-Server++ is a compact single-threaded epoll HTTP 1.1 microserver, for serving API requests only (GET/POST/OPTIONS), when a request arrives, the corresponding lambda will be dispatched for execution to a background thread, using the one-producer/many-consumers model. This way API-Server++ can multiplex thousands of concurrent connections with a single thread dispatching all the network-related tasks. API-Server++ is an async, non-blocking, event-oriented server, async because of the way the tasks are dispatched, it returns immediately to keep processing network events, while a background thread picks the task and executes it. The kernel will notify the program when there are events to process, in which case, non-blocking operations will be used on the sockets, and the program won't consume CPU while waiting for events, this way a single-threaded server can serve thousands of concurrent clients if the I/O tasks are fast. The size of the workers' thread pool can be configured via environment variable, the default is 4, which has proved to be good enough for high loads on VMs with 4-6 virtual cores.
 
-API-Server++ was designed to be run as a container on Kubernetes, with a stateless security/session model based on JSON web token (good for scalability), and built-in observability features for Grafana stack, but it can be run as a regular program on a terminal or as a SystemD Linux service, on production it will run behind an Ingress or Load Balancer providing TLS and Layer-7 protection.
+API-Server++ was designed to be run as a container on Kubernetes, with a stateless security/session model based on JSON web token (good for scalability), and built-in observability features for Grafana stack, but it can be run as a regular program on a terminal for development or as a SystemD Linux service for production, tightly integrated with native Linux log facilities, on production it will run behind an Ingress or Load Balancer providing TLS and Layer-7 protection.
 
-It uses the native PostgreSQL client C API `libpq` for maximum speed, as well as `libcurl` for secure email and `openssl v3` for JWT signatures. It expects a JSON response from queries returning data, which is very easy to do using PostgreSQL functions.
+It uses direct calls to the ODBC C API for maximum speed, as well as `libcurl` for secure email and `openssl v3` for JWT signatures. It expects a JSON response from queries returning data, which is very easy to do with stored procedures in most modern databases.
 
-![webapi helloworld](https://github.com/cppservergit/apiserver/assets/126841556/40fcc7fb-533e-429e-aea0-d87923f58a01)
+![image](https://github.com/cppservergit/apiserver-odbc/assets/126841556/ab9c74b9-097f-4899-a564-b46d3cc931c1)
 
 
 ## Requirements
 
-The test environment is Ubuntu 23.04 with GCC 13.1, We used Canonical's Multipass VMs on Windows 10 Pro, it's a very agile tool for managing lightweight VMs on Windows, you can create an Ubuntu 23.04 VM using a command like this, with very few resources:
+The test environment is Ubuntu 23.10 with GCC 13.2, We used Canonical's Multipass VMs on Windows 10 Pro, it's a very agile tool for managing lightweight VMs on Windows, you can create an Ubuntu 23.10 VM using a command like this, with very few resources:
 ```
-multipass launch -n testvm -c 4 -m 2g -d 6g lunar
+multipass launch -n testvm -c 4 -m 2g -d 6g mantic
 ```
 If you are not going to update the whole operating system then you can use `-d 4g` for 4GB of disk space.
 
@@ -63,61 +63,46 @@ sudo apt update
 
 Install required packages:
 ```
-sudo apt install g++-13 libssl-dev libpq-dev libcurl4-openssl-dev uuid-dev libjson-c-dev libldap-dev make -y --no-install-recommends
+sudo apt install g++-13 libssl-dev libpq-dev libcurl4-openssl-dev uuid-dev libjson-c-dev libldap-dev unixodbc-dev tdsodbc make -y --no-install-recommends
 ```
 
-Optionally, you can upgrade the rest of the operating system, it may take some minutes and require a restart of the VM:
+Optionally, if your VM has enough disk space (10GB) you can upgrade the rest of the operating system, it may take some minutes and require a restart of the VM:
 ```
 sudo apt upgrade -y
 ```
 
-__Note__: You can run API-Server++ on Ubuntu 22.04 if you create a native Linux LXD container with Ubuntu 23.04 to run the API-Server++ binary and use HAProxy as the HTTPS front on Ubuntu 22.04 (the server host OS), this way you can run on a reliable LTS Ubuntu server, and also protect network access to API-Server++, which is only visible from the host via HAProxy.
+__Notes__: 
 
-![image](https://github.com/cppservergit/apiserver/assets/126841556/2cfacfdc-6eba-4698-b2b9-b3a1ffa88fbd)
+* You can run API-Server++ on Ubuntu 22.04 if you create a native Linux LXD container with Ubuntu 23.10 to run the API-Server++ binary and use HAProxy as the HTTPS front on Ubuntu 22.04 (the server host OS), this way you can run on a reliable LTS Ubuntu server, and also protect network access to API-Server++, which is only visible from the host via HAProxy.
 
-API-Server++ requires GCC 13.1 or newer because it does take advantage of the latest C++ 20/23 standard features that are only supported by GCC 13.1 onwards, like `<format>`, constexpr strings and functions, ranges, and more.
+![image](https://github.com/cppservergit/apiserver-odbc/assets/126841556/b168d1f7-28b3-40f2-8bfb-78eb68045916)
 
-### PostgreSQL testdb setup
+* Starting on April 2024 Ubuntu 24.04 LTS can be used for production on the host and the container.
+* At present the Microsoft ODBC Driver can be used on Ubuntu 23.04, this would be a constraint for the LXD container if you want to use this driver, otherwise you can use FreeTDS ODBC driver (for Sybase too) with more recent versions of Ubuntu Server.
 
-Download TestDB backup:
+API-Server++ requires GCC 13.1 or newer because it does take advantage of the latest C++ 20/23 standard features that are only supported by GCC 13.1 onwards, like `<format>`, constexpr strings and functions, ranges, and more. This way API-Server++ achieves an "A" qualification with SonarQube static analyzer
+
+### Demo database setup setup
+
+Download backups for SQLServer:
 ```
-curl https://cppserver.com/files/apiserver/testdb.backup -O
-```
+curl https://cppserver.com/files/apiserver/testdb.bak -O
+curl https://cppserver.com/files/apiserver/demodb.bak -O
 
-Please restore this backup in your PostgreSQL server, this database contains a sample schema with several tables to exercise different kinds of APIs, it also contains the minimal security tables and the stored procedure `cpp_dblogin` to support an SQL-based login mechanism, so you can test API-Server++ JWT (JSON web token) implementation.
-
-#### Using PostgreSQL as a docker container
-
-If you have a VM with docker, you can quickly install PostgreSQL using this command, change the password if you want but take care to use your new password in the commands following below:
-```
-sudo docker run --restart unless-stopped --name pgsql --network host -e POSTGRES_PASSWORD=basica -d postgres:latest
-```
-The command above will create a container named `pgsql`, and the `postgres` user password will be `basica`.
-
-If you are using PostgreSQL as a docker container, you can use this command to create TestDB and then restore the backup, change host and password to meet your settings:
-```
-sudo docker exec -e PG_PASSWORD=basica pgsql psql -h localhost -U postgres -c 'create database testdb;'
 ```
 
-Restore:
-```
-cat testdb.backup | sudo docker exec -i -e PG_PASSWORD=basica pgsql pg_restore -d testdb -h localhost -U postgres
-```
-
-If you already have a PostgreSQL server running somewhere, just create `testdb` and restore the backup.
-
-Take note of your PostgreSQL hostname or IP address, you will need it to configure the script used to run API-Server++.
+Please restore these backups in your SQLServer development instance, DemoDB contains several tables to exercise different kinds of APIs, while TestDB contains the minimal security tables and the stored procedure `cpp_dblogin` to support an SQL-based login mechanism, so you can test API-Server++ JWT (JSON web token) implementation. You can use your own database for API testing, but for security purposes, TestDB is required, although it can be replaced later by your own security DB, as long as you provide a compatible `cpp_dblogin` stored procedure, more details will be provided in a forward section of this README.
 
 ## Build
 
-Retrieve latest version of API-Server++
+Retrieve latest version of API-Server++ ODBC
 ```
-git clone https://github.com/cppservergit/apiserver
+git clone https://github.com/cppservergit/apiserver-odbc
 ```
 
 Navigate into API-Server++ directory
 ```
-cd apiserver
+cd apiserver-odbc
 ```
 
 Compile and build executable
@@ -127,31 +112,30 @@ make
 
 Expected output:
 ```
-g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=6 -fno-extern-tls-init -march=native -mtune=intel -c src/env.cpp
-g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=6 -fno-extern-tls-init -march=native -mtune=intel -c src/logger.cpp
-g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=6 -fno-extern-tls-init -march=native -mtune=intel -c src/jwt.cpp
-g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=6 -fno-extern-tls-init -march=native -mtune=intel -c src/httputils.cpp
-g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=6 -fno-extern-tls-init -march=native -mtune=intel -c src/sql.cpp
-g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=6 -fno-extern-tls-init -march=native -mtune=intel -c src/login.cpp
-g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=6 -fno-extern-tls-init -march=native -mtune=intel -DCPP_BUILD_DATE=20230807 -c src/server.cpp
-g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=6 -fno-extern-tls-init -march=native -mtune=intel -c src/main.cpp
-g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=6 -fno-extern-tls-init -march=native -mtune=intel env.o logger.o jwt.o httputils.o sql.o login.o server.o main.o -lpq -lcurl -lcrypto -luuid -ljson-c -o "apiserver"
+g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel -c src/env.cpp
+g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel -c src/logger.cpp
+g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel -c src/jwt.cpp
+g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel -c src/httputils.cpp
+g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel -c src/sql.cpp
+g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel -c src/login.cpp
+g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel -DCPP_BUILD_DATE=20230807 -c src/server.cpp
+g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel -c src/main.cpp
+g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel env.o logger.o jwt.o httputils.o sql.o login.o server.o main.o -lodbc -lcurl -lcrypto -luuid -ljson-c -o "apiserver"
 ```
 
 ## Run API-Server++
 
-Please edit run script and fix the PostgreSQL connection strings to meet your environment:
+Please edit run script and fix the ODBC connection strings to meet your environment:
 ```
 nano run
 ```
 
 Search for these entries:
-
 ```
-# PGSQL authenticator config
-export CPP_LOGINDB="host=demodb.mshome.net port=5432 dbname=testdb connect_timeout=10 user=postgres password=basica application_name=CPPServer"
-# PGSQL data sources
-export DB1="host=demodb.mshome.net port=5432 dbname=testdb connect_timeout=10 user=postgres password=basica application_name=CPPServer"
+# ODBC SQL authenticator config
+export CPP_LOGINDB="Driver=FreeTDS;SERVER=demodb.mshome.net;PORT=1433;DATABASE=testdb;UID=sa;PWD=basica;APP=CPPServer;Encryption=off;ClientCharset=UTF-8"
+# ODBC SQL data sources
+export DB1="Driver=FreeTDS;SERVER=demodb.mshome.net;PORT=1433;DATABASE=demodb;UID=sa;PWD=basica;APP=CPPServer;Encryption=off;ClientCharset=UTF-8"
 ```
 
 Default script:
@@ -161,13 +145,13 @@ export CPP_LOGIN_LOG=1
 export CPP_HTTP_LOG=1
 export CPP_PORT=8080
 export CPP_POOL_SIZE=4
-# JWT config
-export CPP_JWT_SECRET="basica"
+# JWT config - NOTE: it is vital to use a hard-to-guess secret
+export CPP_JWT_SECRET="Basica123*"
 export CPP_JWT_EXP=600
-# PGSQL authenticator config
-export CPP_LOGINDB="host=demodb.mshome.net port=5432 dbname=testdb connect_timeout=10 user=postgres password=basica application_name=CPPServer"
-# PGSQL data sources
-export DB1="host=demodb.mshome.net port=5432 dbname=testdb connect_timeout=10 user=postgres password=basica application_name=CPPServer"
+# ODBC SQL authenticator config
+export CPP_LOGINDB="Driver=FreeTDS;SERVER=demodb.mshome.net;PORT=1433;DATABASE=testdb;UID=sa;PWD=basica;APP=CPPServer;Encryption=off;ClientCharset=UTF-8"
+# ODBC SQL data sources
+export DB1="Driver=FreeTDS;SERVER=demodb.mshome.net;PORT=1433;DATABASE=demodb;UID=sa;PWD=basica;APP=CPPServer;Encryption=off;ClientCharset=UTF-8"
 # secure mail config
 export CPP_MAIL_SERVER="smtp://smtp.gmail.com:587"
 export CPP_MAIL_USER="admin@martincordova.com"
