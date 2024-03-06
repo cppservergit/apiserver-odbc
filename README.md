@@ -249,7 +249,7 @@ On the same terminal where API-Server++ is running press CTRL-C to stop the serv
 {"source":"odbcutil","level":"debug","msg":"closing ODBC connection 0x7ff5b4000de0 CPP_LOGINDB","thread":"140693590759104","x-request-id":""}
 {"source":"odbcutil","level":"debug","msg":"closing ODBC connection 0x7ff5c0000e40 CPP_LOGINDB","thread":"140693607544512","x-request-id":""}
 ```
-All resources were released, including ODBC resources.
+All resources were released, including ODBC resources. API-Server++ intercepts Linux signals, it can be stopped via CTRL-C or SystemD-triggered signals, container orchestrators like Kubernetes also use these signals to kill Pods (a running container).
 
 ## Hello World - your first API
 
@@ -310,7 +310,7 @@ int main()
 		{} /* roles */,
 		[](http::request& req) 
 		{
-			req.response.set_body(sql::get_json_response("DB1", "execute sp_shipper_view"));
+			req.response.set_body(sql::get_json_response("DB1", "execute sp_shippers_view"));
 		}
 	);
 
@@ -325,8 +325,8 @@ make
 
 Expected output:
 ```
-g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=6 -fno-extern-tls-init -march=native -mtune=intel -c src/main.cpp
-g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=6 -fno-extern-tls-init -march=native -mtune=intel env.o logger.o jwt.o httputils.o sql.o login.o server.o main.o -lpq -lcurl -lcrypto -luuid -ljson-c -o "apiserver"
+g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=native -mtune=intel -DCPP_BUILD_DATE=20240306 -c src/main.cpp
+g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=native -mtune=intel env.o logger.o jwt.o httputils.o email.o odbcutil.o sql.o login.o util.o main.o -lodbc -lcurl -lcrypto -luuid -ljson-c -o "apiserver"
 ```
 
 Now run the server again:
@@ -362,7 +362,41 @@ curl localhost:8080/api/shippers/view -H "Authorization: Bearer eyJhbGciOiJIUzI1
 
 Expected output:
 ```
-{"status":"OK", "data":[{"shipperid":503,"companyname":"Century 22 Courier","phone":"800-WE-CHARGE"},{"shipperid":13,"companyname":"Federal Courier Venezuela","phone":"555-6728"},{"shipperid":3,"companyname":"Federal Shipping","phone":"(503) 555-9931"},{"shipperid":1,"companyname":"Speedy Express","phone":"(503) 555-9831"},{"shipperid":2,"companyname":"United Package","phone":"(505) 555-3199"},{"shipperid":501,"companyname":"UPS","phone":"500-CALLME"}]}
+{
+  "status": "OK",
+  "data": [
+    {
+      "shipperid": 1,
+      "companyname": "Speedy Express",
+      "phone": "(503) 555-9831"
+    },
+    {
+      "shipperid": 2,
+      "companyname": "United Package",
+      "phone": "(505) 555-3199"
+    },
+    {
+      "shipperid": 3,
+      "companyname": "Federal Shipping",
+      "phone": "(503) 555-9931"
+    },
+    {
+      "shipperid": 13,
+      "companyname": "Federal Courier Venezuela",
+      "phone": "555-6728"
+    },
+    {
+      "shipperid": 501,
+      "companyname": "UPS",
+      "phone": "500-CALLME"
+    },
+    {
+      "shipperid": 503,
+      "companyname": "Century 22 Courier",
+      "phone": "800-WE-CHARGE"
+    }
+  ]
+}
 ```
 
 The token gets validated by API-Server++ before executing your lambda, it has a default duration of 10 minutes and it can be configured via environment variable, in a Kubernetes-friendly way, in any case, authentication and authorization are transparent to your API and always enforced. All registered APIs are secure by default unless explicitly disabled, in this case, a clear message will be recorded in the logs when registering the API:
@@ -375,7 +409,7 @@ The token gets validated by API-Server++ before executing your lambda, it has a 
 It's good to know how to test your APIs the "manual way" using CURL, but when passing the security token is required, it becomes a bit tedious, we can use a very simple HTML page with a bit of modern Javascript to automate API testing including security. For this exercise's sake we will assume that you are in your desktop environment, where you can use a browser to connect to the VM running your API, API-Server++ must be running on your Linux VM. 
 Open the browser and navigate to this URL (PLEASE use your VM IP address or the hostname if you are using Canonical's Multipass VMs on Windows 10 Pro):
 ```
-http://your_VM_address:8080/api/sysinfo
+http://testvm.mshome.net:8080/api/sysinfo
 ```
 
 Expected output on the browser page:
@@ -383,7 +417,7 @@ Expected output on the browser page:
 {"status": "OK", "data":[{"pod":"test","totalRequests":69,"avgTimePerRequest":0.00050976,"connections":2,"activeThreads":1}]}
 ```
 
-There is another built-in API to serve metrics in a Prometheus-compatible format:
+There is another built-in API to serve metrics in a Grafana Prometheus-compatible format:
 ```
 http://your_VM_address:8080/api/metrics
 ```
@@ -404,7 +438,7 @@ cpp_active_threads{pod="test"} 1
 cpp_avg_time{pod="test"} 0.00050264
 ```
 
-Now that we verified that the connection to API-Server++ is OK, let's create an HTML file test.html on your disk, add this content, change the value of the _SERVER_ variable (see the beginning of the `script` section) and save it:
+Now that we verified that the connection to API-Server++ is OK, let's create an HTML file test.html on your disk, add this content and change the value of the _SERVER_ variable at the beginning of the `script` section, and save it:
 ```
 <!doctype html>
 	<head>
@@ -415,48 +449,57 @@ Now that we verified that the connection to API-Server++ is OK, let's create an 
 <html>
 	<main class="container">
 	<article>
-		<h1>Please open the console with [shift+ctrl+i]</h1>
+		<h1>Please open the console with [Shift + Ctrl + i]</h1>
 	</article>
 	</main>
 </html>
 
 <script>
-	// REMEMBER TO CHANGE THIS to point to your Ubuntu VM running API-Server++ !!!
-	const _SERVER_ = "http://test.mshome.net:8080";
+	// REMEMBER TO CHANGE THIS to point to your Ubuntu VM running API-Server++
+	const _SERVER_ = "http://testvm.mshome.net:8080";
 
 	onload = async function() {
+		sessionStorage.setItem("token", ""); //no need for preflight on login
+	
 		//login
 		const loginForm = new FormData();
 		loginForm.append("username", "mcordova");
 		loginForm.append("password", "basica");
+
 		//call and wait for login to return
 		await call_api("/api/login", function(json) {
 				console.log("User: " + json.data[0].displayname);
 				console.log("Token: " + json.data[0].id_token);
 				sessionStorage.setItem("token", json.data[0].id_token); //store token for next request
-			}, loginForm);
+			}, loginForm, postJSON = false);
 
-		//call hello world API
 		call_api("/api/shippers/view", function(json) {
 					console.table(json.data); //print resultset to console
 				});
 	}
 
-	async function call_api(uri, fn, formData)
+	async function call_api(uri, fn, formData, postJSON = false)
 	{
 		try {
 			const token = sessionStorage.getItem("token");
 			const auth = "Bearer " + sessionStorage.getItem("token");
-			let headers = {};
+			const headers = new Headers();
 			if (token != "")
-				headers = { 'Authorization': auth };
+				headers.append("Authorization", auth);
+			
+			if (postJSON)
+				headers.append("Content-type", "application/json");
 			
 			let options;
 			if (formData === undefined)
 				options = {method: 'GET', mode: 'cors', headers};
-			else
-				options = {method: 'POST', mode: 'cors', headers,  body: formData};
-
+			else {
+				if (postJSON)
+					options = {method: 'POST', mode: 'cors', headers,  body: JSON.stringify(Object.fromEntries(formData))};
+				else
+					options = {method: 'POST', mode: 'cors', headers,  body: formData};
+			}
+			
 			const res = await fetch(_SERVER_ + uri, options);
 			if (res.ok) {
 				const json = await res.json();
@@ -466,7 +509,7 @@ Now that we verified that the connection to API-Server++ is OK, let's create an 
 				} else if (json.status == "EMPTY") {
 					console.log("Data not found");
 				} else if (json.status == "INVALID") {
-					console.log("Service data validation error: " + json.validation.description + " id: " + json.validation.id);
+					console.log("Validation error - description: " + json.validation.description + " id: " + json.validation.id);
 				} else if (json.status == "ERROR") {
 					console.log("Service error: " + json.description);
 				}
@@ -482,7 +525,7 @@ Now that we verified that the connection to API-Server++ is OK, let's create an 
 </script>
 ```
 
-Now double-click on the file to open it in the browser, and press `shift+ctrl+i` to open de developer tools, the console in particular, refresh the page several times and watch the results.
+Now double-click on the file to open it in the browser, and press `Shift + Ctrl + i` to open de developer tools, the console in particular, refresh the page several times and watch the results.
 The `call_api()` function is a very handy testing tool that you can use as the base code to invoke your APIs or to use a page like this for quickly unit-testing your APIs, it is far less cumbersome than using CURL alone and you can take advantage of the browser's developer tools.
 
 If you check you API-Server++ terminal you will see some log entries like these:
@@ -497,12 +540,12 @@ If you check you API-Server++ terminal you will see some log entries like these:
 {"source":"access-log","level":"info","msg":"fd=13 remote-ip=172.19.80.1 GET path=/api/sysinfo elapsed-time=0.000008 user=","thread":"140455075771968"}
 ```
 
-You can configure the log to be less verbose by changing the environment variables in the `run` script, which is recommended for production because it has overhead and the Ingress/Load Balancer will produce entries like these anyway, there is no need to duplicate them.
+You can configure the log to be less verbose by changing the environment variables in the `run` script, which is recommended for production or during load tests because it has some overhead and the Ingress/Load Balancer will produce log entries like these anyway, there is no need to duplicate them.
 ```
 export CPP_LOGIN_LOG=0
 export CPP_HTTP_LOG=0
 ```
-__Note__: warnings and error log entries cannot be disabled.
+__Note__: warnings, errors, and custom log entries recorded by your APIs cannot be disabled.
 
 ## Retrieving multiple resultsets
 
