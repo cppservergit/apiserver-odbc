@@ -80,7 +80,7 @@ __Notes__:
 * Starting on April 2024 Ubuntu 24.04 LTS can be used for production on the host and the container.
 * At present the Microsoft ODBC Driver can be used on Ubuntu 23.04, this would be a constraint for the LXD container if you want to use this driver, otherwise you can use FreeTDS ODBC driver (for Sybase too) with more recent versions of Ubuntu Server.
 
-API-Server++ requires GCC 13.1 or newer because it does take advantage of the latest C++ 20/23 standard features that are only supported by GCC 13.1 onwards, like `<format>`, constexpr strings and functions, ranges, and more. This way API-Server++ achieves an "A" qualification with SonarQube static analyzer
+API-Server++ requires GCC 13.1 or newer because it does take advantage of the latest C++ 20/23 standard features that are only supported by GCC 13.1 onwards, like `<format>`, `constexpr` strings and functions, ranges, and more. This way API-Server++ achieves an "A" qualification with SonarQube static analyzer
 
 ### Demo database setup setup
 
@@ -91,16 +91,16 @@ curl https://cppserver.com/files/apiserver/demodb.bak -O
 
 ```
 
-Please restore these backups in your SQLServer development instance, DemoDB contains several tables to exercise different kinds of APIs, while TestDB contains the minimal security tables and the stored procedure `cpp_dblogin` to support an SQL-based login mechanism, so you can test API-Server++ JWT (JSON web token) implementation. You can use your own database for API testing, but for security purposes, TestDB is required, although it can be replaced later by your own security DB, as long as you provide a compatible `cpp_dblogin` stored procedure, more details will be provided in a forward section of this README.
+Please restore these backups in your SQLServer development instance, DemoDB contains several tables to exercise different kinds of APIs, while TestDB contains the minimal security tables and the stored procedure `cpp_dblogin` to support an SQL-based login mechanism, so you can test API-Server++ JWT (JSON web token) implementation. You can use your database for API testing, but for security purposes, TestDB is required, although it can be replaced later by your own security DB, as long as you provide a compatible `cpp_dblogin` stored procedure, more details will be provided in a forward section of this README.
 
 ## Build
 
-Retrieve latest version of API-Server++ ODBC
+Retrieve the latest version of API-Server++ ODBC
 ```
 git clone https://github.com/cppservergit/apiserver-odbc
 ```
 
-Navigate into API-Server++ directory
+Navigate into the API-Server++ directory
 ```
 cd apiserver-odbc
 ```
@@ -130,7 +130,7 @@ Please edit run script and fix the ODBC connection strings to meet your environm
 nano run
 ```
 
-Search for these entries:
+Search for these entries and change the SERVER, DATABASE, and PWD properties according to your environment:
 ```
 # ODBC SQL authenticator config
 export CPP_LOGINDB="Driver=FreeTDS;SERVER=demodb.mshome.net;PORT=1433;DATABASE=testdb;UID=sa;PWD=basica;APP=CPPServer;Encryption=off;ClientCharset=UTF-8"
@@ -181,26 +181,28 @@ Run API-Server++
 
 Expected output:
 ```
-{"source":"signal","level":"info","msg":"signal interceptor registered"}
-{"source":"server","level":"info","msg":"registering built-in diagnostic and security services...","thread":"140336593955712","x-request-id":""}
-{"source":"server","level":"info","msg":"registered (insecure) WebAPI for path: /api/ping","thread":"140336593955712","x-request-id":""}
-{"source":"server","level":"info","msg":"registered (insecure) WebAPI for path: /api/version","thread":"140336593955712","x-request-id":""}
-{"source":"server","level":"info","msg":"registered (insecure) WebAPI for path: /api/sysinfo","thread":"140336593955712","x-request-id":""}
-{"source":"server","level":"info","msg":"registered (insecure) WebAPI for path: /api/metrics","thread":"140336593955712","x-request-id":""}
-{"source":"server","level":"info","msg":"registered (insecure) WebAPI for path: /api/login","thread":"140336593955712","x-request-id":""}
-{"source":"env","level":"info","msg":"port: 8080","thread":"140336593955712","x-request-id":""}
-{"source":"env","level":"info","msg":"pool size: 4","thread":"140336593955712","x-request-id":""}
-{"source":"env","level":"info","msg":"login log: 0","thread":"140336593955712","x-request-id":""}
-{"source":"env","level":"info","msg":"http log: 0","thread":"140336593955712","x-request-id":""}
-{"source":"env","level":"info","msg":"jwt exp: 600","thread":"140336593955712","x-request-id":""}
-{"source":"server","level":"info","msg":"Pod: lunar PID: 4510 starting API-Server++ v1.0.5-20231009","thread":"140336593955712","x-request-id":""}
-{"source":"server","level":"info","msg":"hardware threads: 4 GCC: 13.1.0","thread":"140336593955712","x-request-id":""}
-{"source":"epoll","level":"info","msg":"starting epoll FD: 4","thread":"140336593955712","x-request-id":""}
-{"source":"epoll","level":"info","msg":"listen socket FD: 5 port: 8080","thread":"140336593955712","x-request-id":""}
-{"source":"pool","level":"info","msg":"starting worker thread","thread":"140336593942208","x-request-id":""}
-{"source":"pool","level":"info","msg":"starting worker thread","thread":"140336585549504","x-request-id":""}
-{"source":"pool","level":"info","msg":"starting worker thread","thread":"140336577156800","x-request-id":""}
-{"source":"pool","level":"info","msg":"starting worker thread","thread":"140336442939072","x-request-id":""}
+{"source":"signal","level":"info","msg":"signal interceptor registered","thread":"139909296822784","x-request-id":""}
+{"source":"server","level":"info","msg":"registering built-in diagnostic and security services...","thread":"139909296822784","x-request-id":""}
+{"source":"server","level":"info","msg":"registered (insecure) WebAPI for path: /api/ping","thread":"139909296822784","x-request-id":""}
+{"source":"server","level":"info","msg":"registered (insecure) WebAPI for path: /api/version","thread":"139909296822784","x-request-id":""}
+{"source":"server","level":"info","msg":"registered (insecure) WebAPI for path: /api/sysinfo","thread":"139909296822784","x-request-id":""}
+{"source":"server","level":"info","msg":"registered (insecure) WebAPI for path: /api/metrics","thread":"139909296822784","x-request-id":""}
+{"source":"server","level":"info","msg":"registered (insecure) WebAPI for path: /api/login","thread":"139909296822784","x-request-id":""}
+{"source":"server","level":"info","msg":"registered (insecure) WebAPI for path: /api/docs","thread":"139909296822784","x-request-id":""}
+{"source":"env","level":"info","msg":"port: 8080","thread":"139909296822784","x-request-id":""}
+{"source":"env","level":"info","msg":"pool size: 4","thread":"139909296822784","x-request-id":""}
+{"source":"env","level":"info","msg":"login log: 1","thread":"139909296822784","x-request-id":""}
+{"source":"env","level":"info","msg":"http log: 1","thread":"139909296822784","x-request-id":""}
+{"source":"env","level":"info","msg":"jwt exp: 600","thread":"139909296822784","x-request-id":""}
+{"source":"server","level":"info","msg":"Pod: testvm PID: 2958 starting API-Server++ v1.0.7-20240306","thread":"139909296822784","x-request-id":""}
+{"source":"server","level":"info","msg":"hardware threads: 4 GCC: 13.2.0","thread":"139909296822784","x-request-id":""}
+{"source":"pool","level":"info","msg":"starting worker thread","thread":"139909283182272","x-request-id":""}
+{"source":"pool","level":"info","msg":"starting worker thread","thread":"139909274789568","x-request-id":""}
+{"source":"pool","level":"info","msg":"starting worker thread","thread":"139909266396864","x-request-id":""}
+{"source":"pool","level":"info","msg":"starting worker thread","thread":"139909258004160","x-request-id":""}
+{"source":"server","level":"info","msg":"server started in 0.000355605s","thread":"139909296822784","x-request-id":""}
+{"source":"epoll","level":"info","msg":"starting epoll FD: 4","thread":"139909296822784","x-request-id":""}
+{"source":"epoll","level":"info","msg":"listen socket FD: 5 port: 8080","thread":"139909296822784","x-request-id":""}
 ```
 
 ## Test connection to API-Server++
@@ -212,7 +214,7 @@ curl localhost:8080/api/version
 
 Expected output:
 ```
-{"status": "OK", "data":[{"pod": "test", "server": "API-Server++ v1.0.0-20230807"}]}
+{"status": "OK", "data":[{"pod": "test", "server": "API-Server++ v1.0.7-20240306"}]}
 ```
 
 ## Test login API and JWT
@@ -227,9 +229,31 @@ Expected output (token will vary):
 {"status":"OK","data":[{"displayname":"Martín Córdova","token_type":"bearer","id_token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJsb2dpbiI6Im1jb3Jkb3ZhIiwibWFpbCI6ImNwcHNlcnZlckBtYXJ0aW5jb3Jkb3ZhLmNvbSIsInJvbGVzIjoiY2FuX2RlbGV0ZSwgY2FuX3VwZGF0ZSwgc3lzYWRtaW4iLCJleHAiOjE2OTE0NTQ1OTl9.M2i47hipMt9CxlPPA1zNeIpVIJiPfsMSiVJe0G7ZXHE"}]}
 ```
 
+API-Server++ accepts multipart-form as input, as well as JSON, the same request can be sent as:
+```
+curl --json '{"username":"mcordova", "password":"basica"}' localhost:8080/api/login
+```
+
+## Stop the server
+
+On the same terminal where API-Server++ is running press CTRL-C to stop the server, you should see some messages like these on the console:
+```
+{"source":"signal","level":"info","msg":"stop signal received via epoll","thread":"140693621230080","x-request-id":""}
+{"source":"epoll","level":"info","msg":"closing listen socket FD: 5","thread":"140693621230080","x-request-id":""}
+{"source":"epoll","level":"info","msg":"closing epoll FD: 4","thread":"140693621230080","x-request-id":""}
+{"source":"server","level":"info","msg":"testvm shutting down...","thread":"140693621230080","x-request-id":""}
+{"source":"pool","level":"info","msg":"stopping worker thread","thread":"140693607544512","x-request-id":""}
+{"source":"pool","level":"info","msg":"stopping worker thread","thread":"140693456541376","x-request-id":""}
+{"source":"pool","level":"info","msg":"stopping worker thread","thread":"140693599151808","x-request-id":""}
+{"source":"pool","level":"info","msg":"stopping worker thread","thread":"140693590759104","x-request-id":""}
+{"source":"odbcutil","level":"debug","msg":"closing ODBC connection 0x7ff5b4000de0 CPP_LOGINDB","thread":"140693590759104","x-request-id":""}
+{"source":"odbcutil","level":"debug","msg":"closing ODBC connection 0x7ff5c0000e40 CPP_LOGINDB","thread":"140693607544512","x-request-id":""}
+```
+All resources were released, including ODBC resources.
+
 ## Hello World - your first API
 
-On the same terminal windows where API-Server++ is running, please press CTRL-C to stop the server, now edit main.cpp in order to add your first API definition:
+Edit main.cpp to add your first API definition:
 ```
 nano src/main.cpp
 ```
@@ -245,40 +269,29 @@ Add this code below `server s;` and right above `s.start();`:
 		{} /* roles */,
 		[](http::request& req) 
 		{
-			req.response.set_body( sql::get_json_response("DB1", "select * from fn_shipper_view()") );
+			req.response.set_body(sql::get_json_response("DB1", "execute sp_shipper_view"));
 		}
 	);
 ```
 CTRL-x to exit and save.
 With one line of code, we define a new API, with some metadata including a description, the HTTP method supported, input rules validation if any, authorized roles if any, and most importantly, a lambda function with the code implementing the API, a one-liner in this case, thanks to the high-level abstractions of API-Server++.
 
-The function `sql::get_json_response()` executes a query that MUST return JSON straight from the database, in the specific case of the HelloWorld example the SQL function looks like this:
+The function `sql::get_json_response()` executes a query that MUST return JSON straight from the database, in the specific case of the HelloWorld example the invoked SQL object looks like this:
 
 ```
-CREATE OR REPLACE FUNCTION public.fn_shipper_view()
-    RETURNS TABLE(json character varying) 
-    LANGUAGE 'sql'
-    COST 100
-    VOLATILE SECURITY DEFINER PARALLEL UNSAFE
-    ROWS 1000
-
-AS $BODY$
-
-	select array_to_json(array_agg(row_to_json(d))) from
-		(SELECT
-			shipperid,
-			companyname,
-			phone
-		FROM 
-			demo.shippers
-		ORDER BY
-			companyname) d
-$BODY$;
-
-ALTER FUNCTION public.fn_shipper_view()
-    OWNER TO postgres;
+CREATE procedure [dbo].[sp_shippers_view] as
+begin
+	set nocount on
+	SELECT 
+		shipperid,
+		companyname,
+		phone
+	FROM 
+		shippers WITH (NOLOCK)
+	FOR JSON AUTO 
+end
 ```
-The public schema of TestDB contains several examples of functions that return JSON, including this one, your own SQL functions should follow this pattern because API-Server++ relies on the Database to generate the JSON output from queries returning resultsets, this applies to this native-PostgreSQL version, not for the ODBC version, more on this later at the end of this README.
+The DemoDB database contains several examples of stored procedures that return JSON, including this one, your SPs should follow this pattern because API-Server++ `sql::get_json_response()` function relies on the Database to generate the JSON output from queries returning resultsets. In some cases, an SP does not return anything because it will only affect data without returning a resultset, in other cases if your database is not capable of returning JSON from resultsets, API-Server++ takes charge of generating the JSON from an ODBC resultset returned by the SP.
 
 The whole program should look like this:
 ```
@@ -287,18 +300,19 @@ The whole program should look like this:
 int main()
 {
 	server s;
-        s.register_webapi
-        (
-                webapi_path("/api/shippers/view"),
-                "List of shipping companies",
-                http::verb::GET,
-                {} /* inputs */,
-                {} /* roles */,
-                [](http::request& req)
-                {
-                        req.response.set_body( sql::get_json_response("DB1", "select * from fn_shipper_view()") );
-                }
-        );
+
+	s.register_webapi
+	(
+		webapi_path("/api/shippers/view"), 
+		"List of shipping companies",
+		http::verb::GET, 
+		{} /* inputs */, 	
+		{} /* roles */,
+		[](http::request& req) 
+		{
+			req.response.set_body(sql::get_json_response("DB1", "execute sp_shipper_view"));
+		}
+	);
 
         s.start();
 }
