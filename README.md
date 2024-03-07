@@ -603,7 +603,8 @@ Add this code right above s.start()
 		{} /* roles */,
 		[](http::request& req)
 		{
-			req.response.set_body(sql::get_json_response("DB1", req.get_sql("select * from fn_customer_get($customerid)")));
+			auto sql {req.get_sql("sp_customer_get $customerid")};
+			req.response.set_body(sql::get_json_response("DB1", sql));
 		}
 	);
 ```
@@ -636,7 +637,7 @@ int main()
 	s.register_webapi
 	(
 		webapi_path("/api/customer/info"), 
-		"Retrieve customer record and the list of his purchase orders",
+		"Retrieve a customer main record and its related orders",
 		http::verb::GET, 
 		{ /* inputs */
 			{"customerid", http::field_type::STRING, true}
@@ -644,7 +645,8 @@ int main()
 		{} /* roles */,
 		[](http::request& req)
 		{
-			req.response.set_body(sql::get_json_response("DB1", req.get_sql("execute sp_customer_get $customerid")));
+			auto sql {req.get_sql("sp_customer_get $customerid")};
+			req.response.set_body(sql::get_json_response("DB1", sql));
 		}
 	);
 
@@ -685,7 +687,7 @@ The response is the same JSON document shown above
 
 ## Additional API Examples
 
-The TestDB database has many functions that return JSON and can be used to create APIs, but also stored procedures that modify data (insert/update/delete) and won't return JSON, just execute SQL that should not return any results. There is an example of main.cpp with all the API definitions for this sample database, also an HTML5/CCS3 web responsive frontend to consume these APIs, more on this later. In the following sections you will find different types of Web API definitions, using more features than the examples above.
+The DemoDB database contains many stored procedures that return JSON and can be used to create APIs, but also stored procedures that modify data (insert/update/delete) and won't return any results. There is an example of main.cpp with all the API definitions for this database, as well as an HTML5/CCS3 web-responsive frontend to consume these APIs, more on this later. In the following sections, you will find different types of Web API definitions, using more features than the examples above.
 
 ### Invoke stored procedure to insert or update record
 
@@ -693,7 +695,7 @@ The TestDB database has many functions that return JSON and can be used to creat
 	s.register_webapi
 	(
 		webapi_path("/api/gasto/add"), 
-		"Add expense record",
+		"Add expenses record",
 		http::verb::POST, 
 		{
 			{"fecha", http::field_type::DATE, true},
@@ -704,16 +706,14 @@ The TestDB database has many functions that return JSON and can be used to creat
 		{},
 		[](http::request& req) 
 		{
-			sql::exec_sql("DB1", req.get_sql("call sp_gasto_insert($fecha, $categ_id, $monto, $motivo)"));
+			sql::exec_sql("DB1", req.get_sql("sp_gasto_insert($fecha, $categ_id, $monto, $motivo)"));
 			req.response.set_body("{\"status\": \"OK\"}");
 		}
 	);
 ```
-Input rules are defined for each field, the name, the data type expected, and if it is required or optional, the name will be used to replace the value in the SQL template when using the `req.get_sql`, APi-Server++ takes care of pre-processing the fields to ensure that no SQL-injection attacks so they can be safely replaced into the SQL template. A multipart form POST is the only verb accepted for this API. With this definition of the API, the Server will take care of processing the request and validating the inputs as well as the security (authentication/authorization if roles were defined), when all the preconditions are met, then the lambda function will be executed.
+Input rules are defined for each field, the name, the data type expected, and if it is required or optional, the name will be used to automatically replace the value in the SQL template when using the `req.get_sql()` function, API-Server++ takes care of pre-processing the fields to ensure that no SQL-injection attacks pass thru, so they can be safely replaced into the SQL template. A multipart form POST is the only verb accepted for this API. With this definition of the API, the Server will take care of processing the request and validating the inputs as well as the security (authentication/authorization if roles were defined), when all the preconditions are met, then the lambda function will be executed. You can add your custom validation code inside the lambda function right before the execution of the SP, to add constraints to your API contract, so to speak. When the API executes a procedure that modifies data and does not return any resultsets, then a minimal JSON response with OK status is all that needs to be returned, as shown above.
 
-When the API executes a procedure that modifies data and does not return any resultsets, then a minimal JSON response with OK status is all that needs to be returned.
-
-The case for using a procedure that updates a record is very similar, but in this case we used the roles field to set authorization restrictions, only users with the specified roles (can_update) can invoke this Web API:
+The case for using a procedure that updates a record is very similar, but in this case, we used the roles field to set authorization restrictions, only users with the specified roles (can_update) can invoke this Web API:
 ```
 	s.register_webapi
 	(
@@ -730,35 +730,28 @@ The case for using a procedure that updates a record is very similar, but in thi
 		{"can_update"},
 		[](http::request& req) 
 		{
-			auto sql {req.get_sql("call sp_gasto_update($gasto_id, $fecha, $categ_id, $monto, $motivo)")};
+			auto sql {req.get_sql("sp_gasto_update $gasto_id, $fecha, $categ_id, $monto, $motivo")};
 			sql::exec_sql("DB1", sql);
 			req.response.set_body("{\"status\": \"OK\"}");
 		}
 	);
 ```
+If authorization fails then a JSON with the status "INVALID" will be returned and a description, so the client can react to this case.
 
 The stored procedure that serves as the backend to this Web API:
 ```
-CREATE OR REPLACE PROCEDURE public.sp_gasto_update(
-	IN gasto_id integer,
-	IN fecha date,
-	IN categ_id integer,
-	IN monto double precision,
-	IN motivo character varying)
-LANGUAGE 'sql'
-AS $BODY$
+create procedure sp_gasto_update (@gasto_id int, @fecha as date, @categ_id as int, @monto as float, @motivo as varchar(100)) as
+begin
 
-		UPDATE demo.gasto SET
-			fecha=$2,
-			categ_id=$3,
-			monto=$4,
-			motivo=$5
+		UPDATE gasto SET
+			fecha=@fecha,
+			categ_id=@categ_id,
+			monto=@monto,
+			motivo=@motivo
 		WHERE
-			gasto_id=$1
+			gasto_id=@gasto_id
 			
-$BODY$;
-ALTER PROCEDURE public.sp_gasto_update(integer, date, integer, double precision, character varying)
-    OWNER TO postgres;
+end
 ```
 
 ### Search filter API
