@@ -16,8 +16,7 @@ int main()
 		http::verb::GET, 
 		[](http::request& req) 
 		{
-			std::string sql {"select * from fn_shipper_view()"};
-			req.response.set_body(sql::get_json_response("DB1", sql));
+			req.response.set_body(sql::get_json_response("DB1", "sp_shipper_view"));
 		}
 	);
 	
@@ -39,7 +38,7 @@ This is the declaration of the utility function used to register an API with all
 ```
 You can specify input rules (input parameters, optional), authorized roles (optional), and your lambda function, which most of the time will be very simple, but it can also incorporate additional validations. All this metadata will be used to auto-generate API documentation.
 
-API-Server++ is a compact single-threaded epoll HTTP 1.1 microserver, for serving API requests only (GET/POST/OPTIONS), when a request arrives, the corresponding lambda will be dispatched for execution to a background thread, using the one-producer/many-consumers model. This way API-Server++ can multiplex thousands of concurrent connections with a single thread dispatching all the network-related tasks. API-Server++ is an async, non-blocking, event-oriented server, async because of the way the tasks are dispatched, it returns immediately to keep processing network events, while a background thread picks the task and executes it. The kernel will notify the program when there are events to process, in which case, non-blocking operations will be used on the sockets, and the program won't consume CPU while waiting for events, this way a single-threaded server can serve thousands of concurrent clients if the I/O tasks are fast. The size of the workers' thread pool can be configured via environment variable, the default is 4, which has proved to be good enough for high loads on VMs with 4-6 virtual cores.
+API-Server++ is a compact single-threaded EPOLL HTTP 1.1 microserver for Linux, for serving API requests only (GET/POST/OPTIONS), when a request arrives, the corresponding lambda will be dispatched for execution to a background thread, using the one-producer/many-consumers model. This way API-Server++ can multiplex thousands of concurrent connections with a single thread dispatching all the network-related tasks. API-Server++ is an async, non-blocking, event-oriented server, async because of the way the tasks are dispatched, it returns immediately to keep processing network events, while a background thread picks the task and executes it. The kernel will notify the program when there are events to process, in which case, non-blocking operations will be used on the sockets, and the program won't consume CPU while waiting for events, this way a single-threaded server can serve thousands of concurrent clients if the I/O tasks are fast. The size of the workers' thread pool can be configured via environment variable, the default is 4, which has proved to be good enough for high loads on VMs with 4-6 virtual cores.
 
 API-Server++ was designed to be run as a container on Kubernetes, with a stateless security/session model based on JSON web token (good for scalability), and built-in observability features for Grafana stack, but it can be run as a regular program on a terminal for development or as a SystemD Linux service for production, tightly integrated with native Linux log facilities, on production it will run behind an Ingress or Load Balancer providing TLS and Layer-7 protection.
 
@@ -269,7 +268,7 @@ Add this code below `server s;` and right above `s.start();`:
 		{} /* roles */,
 		[](http::request& req) 
 		{
-			req.response.set_body(sql::get_json_response("DB1", "execute sp_shipper_view"));
+			req.response.set_body(sql::get_json_response("DB1", "sp_shipper_view"));
 		}
 	);
 ```
@@ -310,7 +309,7 @@ int main()
 		{} /* roles */,
 		[](http::request& req) 
 		{
-			req.response.set_body(sql::get_json_response("DB1", "execute sp_shippers_view"));
+			req.response.set_body(sql::get_json_response("DB1", "sp_shippers_view"));
 		}
 	);
 
@@ -630,7 +629,7 @@ int main()
                 {} /* roles */,
                 [](http::request& req)
                 {
-                        req.response.set_body( sql::get_json_response("DB1", "select * from fn_shipper_view()") );
+                        req.response.set_body(sql::get_json_response("DB1", "sp_shipper_view"));
                 }
         );
 
@@ -706,12 +705,13 @@ The DemoDB database contains many stored procedures that return JSON and can be 
 		{},
 		[](http::request& req) 
 		{
-			sql::exec_sql("DB1", req.get_sql("sp_gasto_insert($fecha, $categ_id, $monto, $motivo)"));
-			req.response.set_body("{\"status\": \"OK\"}");
+			auto sql {req.get_sql("sp_gasto_insert $fecha, $categ_id, $monto, $motivo")};
+			sql::exec_sql("DB1", sql);
+			req.response.set_body(R"({"status":"OK"})");
 		}
 	);
 ```
-Input rules are defined for each field, the name, the data type expected, and if it is required or optional, the name will be used to automatically replace the value in the SQL template when using the `req.get_sql()` function, API-Server++ takes care of pre-processing the fields to ensure that no SQL-injection attacks pass thru, so they can be safely replaced into the SQL template. A multipart form POST is the only verb accepted for this API. With this definition of the API, the Server will take care of processing the request and validating the inputs as well as the security (authentication/authorization if roles were defined), when all the preconditions are met, then the lambda function will be executed. You can add your custom validation code inside the lambda function right before the execution of the SP, to add constraints to your API contract, so to speak. When the API executes a procedure that modifies data and does not return any resultsets, then a minimal JSON response with OK status is all that needs to be returned, as shown above.
+Input rules are defined for each field, the name, the data type expected, and if it is required or optional, the name will be used to automatically replace the value in the SQL template when using the `req.get_sql()` function, API-Server++ takes care of pre-processing the fields to ensure that no SQL-injection attacks pass thru, so they can be safely replaced into the SQL template. A multipart form POST is the only verb accepted for this API. With this definition of the API, the Server will take care of processing the request and validating the inputs as well as the security (authentication/authorization if roles were defined), when all the preconditions are met, then the lambda function will be executed. You can add your custom validation code inside the lambda function right before the execution of the SP, to add constraints to your API contract, so to speak. When the API executes a procedure that modifies data and does not return any resultsets, then a minimal JSON response with OK status is all that needs to be returned, as shown above. Also in this case the function `sql::exec_sql()` is used to execute a stored procedure that does not return a resultset.
 
 The case for using a procedure that updates a record is very similar, but in this case, we used the roles field to set authorization restrictions, only users with the specified roles (can_update) can invoke this Web API:
 ```
@@ -732,12 +732,20 @@ The case for using a procedure that updates a record is very similar, but in thi
 		{
 			auto sql {req.get_sql("sp_gasto_update $gasto_id, $fecha, $categ_id, $monto, $motivo")};
 			sql::exec_sql("DB1", sql);
-			req.response.set_body("{\"status\": \"OK\"}");
+			req.response.set_body(R"({"status":"OK"})");
 		}
 	);
 ```
 If authorization fails then a JSON with the status "INVALID" will be returned and a description, so the client can react to this case.
-
+```
+{
+    "status": "INVALID",
+    "validation": {
+        "id": "_dialog_",
+        "description": "err.accessdenied"
+    }
+}
+```
 The stored procedure that serves as the backend to this Web API:
 ```
 create procedure sp_gasto_update (@gasto_id int, @fecha as date, @categ_id as int, @monto as float, @motivo as varchar(100)) as
@@ -756,7 +764,7 @@ end
 
 ### Search filter API
 
-This API executes an SQL function that returns a JSON response, sales by category for a period of time, the date-from/date-to parameters are the input rules for this API:
+This API executes a stored procedure that returns a JSON response to fill a sales report, sales by category between two dates, the date-from/date-to parameters are the input rules for this API:
 ```
 	s.register_webapi
 	(
@@ -770,15 +778,71 @@ This API executes an SQL function that returns a JSON response, sales by categor
 		{"report", "sysadmin"},
 		[](http::request& req) 
 		{
-			auto sql {req.get_sql("select * from fn_sales_by_category($date1, $date2)")};
+			auto sql {req.get_sql("sp_sales_by_category $date1, $date2")};
 			std::string json {sql::get_json_response("DB1", sql)};
 			req.response.set_body(json);
 		}
 	);
 ```
-The backend SQL function may be of a certain complexity, but it's hidden from the API implementation, as long as it returns JSON, we are good.
-In this example we also used a list of authorized roles, the user invoking the API must belong to any of those roles, otherwise, execution will be denied and a JSON response with the status INVALID will be returned.
-If you want to test this API, there is data for dates between 1994-01-01 and 1996-12-31.
+API-Server++ will enforce both security (authentication and authorization) and input validation rules automatically.
+
+This is an HTML5 representation of the frontend for this API:
+![image](https://github.com/cppservergit/apiserver-odbc/assets/126841556/d22b33cb-d7fd-459f-8653-e1a884e47722)
+
+The JSON response:
+```
+{
+    "status": "OK",
+    "data": [
+        {
+            "id": 1,
+            "item": "Beverages",
+            "subtotal": 267868.18
+        },
+        {
+            "id": 4,
+            "item": "Dairy Products",
+            "subtotal": 234507.285
+        },
+        {
+            "id": 3,
+            "item": "Confections",
+            "subtotal": 167357.225
+        },
+        {
+            "id": 6,
+            "item": "Meat/Poultry",
+            "subtotal": 163022.3595
+        },
+        {
+            "id": 8,
+            "item": "Seafood",
+            "subtotal": 131261.7375
+        },
+        {
+            "id": 2,
+            "item": "Condiments",
+            "subtotal": 106047.085
+        },
+        {
+            "id": 7,
+            "item": "Produce",
+            "subtotal": 99984.58
+        },
+        {
+            "id": 5,
+            "item": "Grains/Cereals",
+            "subtotal": 95744.5875
+        }
+    ]
+}
+```
+The backend stored procedure may be of a certain SQL complexity, as in this case, but this is hidden from the API implementation, as long as it returns JSON, we are good.
+In this example we also used a list of authorized roles `{"report", "sysadmin"}`, the user invoking the API must belong to any of those roles, otherwise, execution will be denied and a JSON response with the status INVALID will be returned, a detailed log record will be generated by API-Server++ for security audit purposes:
+```
+{"source":"service","level":"error","msg":"/api/sales/query, Access denied for user: mbencomo from IP: 172.27.160.1 reason: User roles are not authorized to execute this service: general","thread":"140221297444544","x-request-id":""}
+```
+__NOTE__: If you want to test this API, use dates between 1994-01-01 and 1996-12-31.
 
 ### Delete record API with additional custom validator
 
