@@ -1013,11 +1013,13 @@ In order to use the basic login adapter included with API-Server++ you will need
 
 ![image](https://github.com/cppservergit/apiserver-odbc/assets/126841556/2e754828-f1ab-4e93-bb74-2d6574c152dd)
 
-The underlying tables structure is not relevant to API-Server++, it only requires the existence of a stored procedure `cpp_dblogin( @userlogin varchar(100), @userpassword varchar(100) )` that will allways return the same resultset with 1 row with some specific columns: 
+The underlying tables structure is not relevant to API-Server++, it only requires the existence of a stored procedure `cpp_dblogin( @userlogin varchar(100), @userpassword varchar(100) )` that will allways return the same resultset with 1 row with some specific columns:
+
 ![image](https://github.com/cppservergit/apiserver-odbc/assets/126841556/e76912ce-0686-4aff-92d6-42eb584f82ef)
 
 If the login, for any reason, fails, then the columns corresponding to the validation error should be returned and the others are NULL:
-![image](https://github.com/cppservergit/apiserver-odbc/assets/126841556/454b82b6-e15d-480b-bbdf-613744b85a41)
+
+![image](https://github.com/cppservergit/apiserver-odbc/assets/126841556/7b9c29b9-7296-4a8b-8730-b8e262585019)
 
 The column rolenames should contain the roles of the user separated by ",". We provide an example of such a stored procedure for the very basic TestDB, you can use it as a template to create one that matches your security schema. TestDB uses an SHA256 hashed password for storing user credentials, which is better than using encrypted passwords, but if you use an external encryption mechanism and then store the password as a Base64 string, that can also be adapted into the `login.cpp` module, please open an issue on this Repo if you need orientation on your adaptation of the login API and SP.
 ```
@@ -1112,8 +1114,21 @@ END
 
 ### The login module
 
-The `login.cpp` module depends on sql.h/sql.cpp, it invokes the `cpp_dblogin` stored procedure and returns a data structure with the values returned by the resultset, the Login API, prebuilt into server.h uses this module and also jwt, if the login was successful then a JSON web token must be returned as part of the JSON response.
+The `login.cpp` module depends on sql.h/sql.cpp, it invokes the `cpp_dblogin` stored procedure and returns a data structure with the values returned by the resultset, the Login API, prebuilt into server.h uses this module and also jwt, if the login was successful then a JSON web token must be returned as part of the JSON response:
+```
+{
+    "status": "OK",
+    "data": [
+        {
+            "displayname": "María Eugenia Bencomo",
+            "token_type": "bearer",
+            "id_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJsb2dpbiI6Im1iZW5jb21vIiwibWFpbCI6ImNwcHNlcnZlckBtYXJ0aW5jb3Jkb3ZhLmNvbSIsInJvbGVzIjoiZ2VuZXJhbCIsImV4cCI6MTcwOTg0MzEzNH0.bBskwfJmtkurHBhrlS2gNBBRxh0p7Y8Zb-_JNptLxLM"
+        }
+    ]
+}
+```
 
+This is the login module interface:
 ```
 namespace login
 {
