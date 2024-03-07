@@ -842,6 +842,15 @@ In this example we also used a list of authorized roles `{"report", "sysadmin"}`
 ```
 {"source":"service","level":"error","msg":"/api/sales/query, Access denied for user: mbencomo from IP: 172.27.160.1 reason: User roles are not authorized to execute this service: general","thread":"140221297444544","x-request-id":""}
 ```
+The JavaScript code required to test this API using test.html is this:
+```
+		const salesForm = new FormData();
+		salesForm.append("date1", "1994-01-01");
+		salesForm.append("date2", "1996-12-31");
+		await call_api("/api/sales/query", function(json) {
+				console.log(JSON.stringify(json));
+			}, salesForm);
+```
 __NOTE__: If you want to test this API, use dates between 1994-01-01 and 1996-12-31.
 
 ### Delete record API with additional custom validator
@@ -998,178 +1007,112 @@ SonarCloud is the top player in C++ static analysis, performing rigorous analysi
 
 We managed to fix all issues reported and the current code base has achieved a perfect score for all the code, no issues of any kind were detected.
 
-## Static analysis with open-source tools
+## Implementing the security backend in SQL Server
 
-API-Sever++ has been tested with CPPCheck and FlawFinder, it has passed all tests, FlawFinder prints 3 warnings that can be safely assumed as false positives:
+In order to use the basic login adapter included with API-Server++ you will need some tables and a stored procedure, you can use the sample database `TestDB` for quick tests, or adapt the expected stored procedure `cpp_dblogin` to an existing database.
 
+![image](https://github.com/cppservergit/apiserver-odbc/assets/126841556/2e754828-f1ab-4e93-bb74-2d6574c152dd)
+
+The underlying tables structure is not relevant to API-Server++, it only requires the existence of a stored procedure `cpp_dblogin( @userlogin varchar(100), @userpassword varchar(100) )` that will allways return the same resultset with 1 row with some specific columns: 
+![image](https://github.com/cppservergit/apiserver-odbc/assets/126841556/e76912ce-0686-4aff-92d6-42eb584f82ef)
+
+If the login, for any reason, fails, then the columns corresponding to the validation error should be returned and the others are NULL:
+![image](https://github.com/cppservergit/apiserver-odbc/assets/126841556/454b82b6-e15d-480b-bbdf-613744b85a41)
+
+The column rolenames should contain the roles of the user separated by ",". We provide an example of such a stored procedure for the very basic TestDB, you can use it as a template to create one that matches your security schema. TestDB uses an SHA256 hashed password for storing user credentials, which is better than using encrypted passwords, but if you use an external encryption mechanism and then store the password as a Base64 string, that can also be adapted into the `login.cpp` module, please open an issue on this Repo if you need orientation on your adaptation of the login API and SP.
 ```
-FINAL RESULTS:
-
-src/env.cpp:26:  [3] (buffer) getenv:
-  Environment variables are untrustable input if they can be set by an
-  attacker. They can have any content and length, and the same variable can
-  be set more than once (CWE-807, CWE-20). Check environment variables
-  carefully before using them.
-src/env.cpp:42:  [3] (buffer) getenv:
-  Environment variables are untrustable input if they can be set by an
-  attacker. They can have any content and length, and the same variable can
-  be set more than once (CWE-807, CWE-20). Check environment variables
-  carefully before using them.
-src/server.cpp:455:  [1] (buffer) read:
-  Check buffer boundaries if used in a loop including recursive loops
-  (CWE-120, CWE-20).
-```
-
-The first two mention code related to reading environment variables, which in the case of API-Server++ is an unavoidable task and is always supplied by a system administrator, when using Kubernetes some of them would be Secrets, so they are safe to read, and the code used to read the variables takes care of safe type conversion and `nullptr` checks, example:
-
-```
-	unsigned short int env_vars::read_env(const char* name, unsigned short int default_value) noexcept
-	{
-		unsigned short int value{default_value};
-		if (const char* env_p = std::getenv(name)) {
-			std::string_view str(env_p);
-			auto [ptr, ec] = std::from_chars(str.data(), str.data() + str.size(), value);
-			if (ec == std::errc::invalid_argument)
-				logger::log(LOGGER_SRC, "warn", std::string(__FUNCTION__) + " -> invalid argument for std::from_chars: " + std::string(env_p) + " env-var: " + std::string(name), true);
-			else if (ec == std::errc::result_out_of_range)
-				logger::log(LOGGER_SRC, "warn", std::string(__FUNCTION__) + " -> number out of range in std::from_chars: " + std::string(env_p) + " env-var: " + std::string(name), true);
-		}
-		return value;
-	}
-```
-The code above will not accept an invalid value, if one was supplied via the environment, then it will return the default value. Modern C++ is used to achieve this.
-
-The last one is related to the use of the read() C function used to read from data from sockets, in this case, a C++ std::array type is used for the buffer, and there is no way a buffer overflow can happen:
-```
-int count = read(fd, data.data(), data.size());
-```
-It won't read more bytes than `data.size()`.
-
-Therefore we can assume these warnings are not relevant and the program is memory-safe. 
-For the dynamic runtime instrumentation, the program was bombarded with 2000 concurrent connections and thousands of requests, so all code was covered (it's a simple program, not many paths of execution), and no leaks were found.
-
-## API-Server++ for ODBC
-
-There is a separate branch of this project that instead of using the native PostgreSQL driver the server does use the ODBC API. This way you can connect to SQL Server, Sybase, or DB2 using their native ODBC drivers. Please note that in the case of SQL Server, its ODBC driver is the native client.
-
-### Pre-requisites
-
-For development purposes please install these packages:
-```
-sudo apt install g++-13 libssl-dev libpq-dev libcurl4-openssl-dev uuid-dev libjson-c-dev libldap-dev unixodbc-dev tdsodbc make -y --no-install-recommends
-```
-This command will also install [FreeTDS](https://www.freetds.org/index.html) ODBC driver for SQL Server and Sybase.
-
-### Register FreeTDS driver for SQLServer and Sybase
-
-Edit odbcinst.ini
-```
-sudo nano /etc/odbcinst.ini
-```
-
-Add this content:
-```
-[FreeTDS]
-Driver=/usr/lib/x86_64-linux-gnu/odbc/libtdsodbc.so
-UsageCount=1
-```
-CTRL-X + Y to save.
-
-### Retrieve ODBC branch from GitHub
-
-If you are already using the PgSQL version of API-Server++ please use another directory to clone the ODBC branch, it's basically the same project but with two different modules, sql and login.
-```
-git clone -b odbc https://github.com/cppservergit/apiserver.git
-```
-
-To build is the same procedure:
-```
-cd apiserver
-```
-
-Compile:
-```
-make
-```
-
-### Implementing the security tables in SQL Server
-
-In order to use the basic login adapter included with API-Server++ you will need some tables and a stored procedure, you can use a new database `testdb` for this purpose, or create them on any existing database.
-
-![image](https://github.com/cppservergit/apiserver/assets/126841556/1dcbaeae-6881-457c-89b3-6cd207d3148f)
-
-The underlying tables structure is not relevant to API-Server++, it only requires the existence of a stored procedure `cpp_dblogin( @userlogin varchar(100), @userpassword varchar(100) )` that will return a resultset with 1 row and 3 columns if the login was successful: mail, displayname and rolenames, this last field should contain the roles of the user separated by ",". We provide an example of such a stored procedure for a very basic security database model, you can find its definition at the end of the script.
-
-```
-CREATE TABLE testdb.dbo.s_role (
-	role_id int IDENTITY(1,1) NOT NULL,
-	rolename varchar(100) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
-	CONSTRAINT PK__s_role__CD994BF27B3DC626 PRIMARY KEY (role_id)
-);
-
-CREATE TABLE testdb.dbo.s_user (
-	user_id int IDENTITY(1,1) NOT NULL,
-	userlogin varchar(100) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
-	passwd varchar(100) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
-	displayname varchar(100) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
-	mail varchar(100) COLLATE SQL_Latin1_General_CP1_CI_AS NOT NULL,
-	CONSTRAINT PK__s_user__CBA1B25775A0F870 PRIMARY KEY (user_id),
-	CONSTRAINT s_user_UN UNIQUE (userlogin)
-);
-
-CREATE TABLE testdb.dbo.s_user_role (
-	user_role_id int IDENTITY(1,1) NOT NULL,
-	user_id int NOT NULL,
-	role_id int NOT NULL,
-	CONSTRAINT PK__s_user_r__CD994BF2DA948C68 PRIMARY KEY (role_id),
-	CONSTRAINT s_user_role_FK FOREIGN KEY (user_id) REFERENCES testdb.dbo.s_user(user_id) ON DELETE CASCADE,
-	CONSTRAINT s_user_role_FK2 FOREIGN KEY (role_id) REFERENCES testdb.dbo.s_role(role_id) ON DELETE CASCADE
-);
-
-INSERT INTO testdb.dbo.s_user
-           (userlogin, passwd, displayname, mail)
-     VALUES
-		('mcordova', 'sY1Y5lZMlyG12Kr0P4qQXOv2H50ycI63kft1e4pmoR4=', 'Martín Córdova', 'cppserver@martincordova.com'),
-        ('mbencomo', 'BiumdlzR0xeh4VUSNmHkBXn5sFLnFG0VDBx/JcJsc5Y=', 'María Eugenia Bencomo', 'cppserver@martincordova.com');
-
-INSERT INTO testdb.dbo.s_role (rolename) VALUES
-	 ('sysadmin'),
-	 ('can_delete'),
-	 ('can_update'),
-	 ('general');
-	 
-INSERT INTO testdb.dbo.s_user_role (user_id,role_id) VALUES
-	 (1,1),
-	 (1,2),
-	 (1,3),
-	 (2,4);
-
-CREATE procedure [dbo].[cpp_dblogin] ( @userlogin varchar(100), @userpassword varchar(100) ) as
-begin
+/*
+ * Returns a resultset with these columns:
+ * status (OK|INVALID)
+ * email
+ * displayname
+ * rolenames
+ * error_code
+ * error_description
+ * 
+ * If status = INVALID then error_code and error_description will return data and all other columns will be NULL,
+ * the opposite if status = OK.
+ * This SP checks if system is available before attempting login, then it validates credentials and tests
+ * if the account is OK if credentials passed.
+ * 
+ * Suggested error codes:
+ * LE001 = invalid credentials
+ * LE002 = account blocked or suspended
+ * LE003 = reset password or password expired
+ * LE004 = system offline, retry later
+ */
+CREATE or ALTER procedure [dbo].[cpp_dblogin2] ( @userlogin varchar(100), @userpassword varchar(100) ) as
+BEGIN
 
 	DECLARE @pwd varchar(200);
 	DECLARE @encodedpwd varchar(200);
+	DECLARE @status int;
+	DECLARE @mail varchar(100);
+	DECLARE @displayname varchar(100);
 	set @pwd = @userlogin + ':' + @userpassword;
 	
-	select distinct STRING_AGG(r.rolename, ' ') as rolenames into #roles from testdb.dbo.s_user_role ur inner join testdb.dbo.s_user u
-	on u.user_id = ur.user_id
-	inner join testdb.dbo.s_role r on r.role_id = ur.role_id
-	where u.userlogin = @userlogin;
+	/* get user roles */
+	SELECT distinct STRING_AGG(r.rolename, ', ') as rolenames INTO #roles FROM testdb.dbo.s_user_role ur INNER JOIN testdb.dbo.s_user u
+	ON u.user_id = ur.user_id
+	INNER JOIN testdb.dbo.s_role r ON r.role_id = ur.role_id
+	WHERE u.userlogin = @userlogin;
 	
+	/* generate encoded password hash */
 	SET @encodedpwd = (select hashbytes('SHA2_256', @pwd) FOR XML PATH(''), BINARY BASE64);
 	set nocount on
-	
-	select mail as email, displayname, rolenames from testdb.dbo.s_user WITH (NOLOCK), #roles where
-	userlogin = @userlogin and passwd = @encodedpwd
 
-end
+	/* system is available? */
+	IF EXISTS(SELECT 1 FROM testdb.dbo.s_system_flags WITH (NOLOCK) WHERE offline = 0) 
+		BEGIN
+			/* are login credentials OK? */
+			IF EXISTS(SELECT 1 FROM testdb.dbo.s_user WITH (NOLOCK) WHERE userlogin = @userlogin AND passwd = @encodedpwd)
+				BEGIN 
+					/* user's account is OK? */
+					SELECT @status = status, @mail = mail, @displayname = displayname FROM testdb.dbo.s_user WITH (NOLOCK) WHERE userlogin = @userlogin;
+					IF @status = 0
+						BEGIN
+							select 'OK' as status, @mail as email, @displayname as displayname, rolenames, null as error_code, null as error_description 
+							from 
+								#roles 
+						END
+					ELSE
+						/* user's account has problems, can't accept login */
+						BEGIN
+							SELECT 
+								'INVALID' as status, 
+								null as email, 
+								null as displayname, 
+								null as rolenames, 
+								CASE 
+									WHEN @status = 1 THEN 'LE002'
+									WHEN @status = 2 THEN 'LE003'
+									ELSE 'E099'
+								END AS error_code, 
+								CASE 
+									WHEN @status = 1 THEN 'Account blocked'
+									WHEN @status = 2 THEN 'Reset password'
+									ELSE 'Unknown status'
+								END AS error_description 
+						END
+				END
+			ELSE
+				/* invalid login or password */
+				BEGIN
+					select 'INVALID' as status, null as email, null as displayname, null as rolenames, 'LE001' as error_code, 'Invalid credentials' as error_description
+				END
+		END
+	ELSE
+		/* system unavailable */
+		select 'INVALID' as status, null as email, null as displayname, null as rolenames, 'LE004' as error_code, 'System unavailable, please try later' as error_description
+		
+END
 ;
+
 ```
-The SQL objects shown above are equivalent to the PostgreSQL `TestDB` sample database.
 
 ### The login module
 
-The `login.cpp` module in the odbc branch is almost the same as the one in the master (PostgreSQL) branch, only the SQL for calling the stored procedure CPP_DBLOGIN changes. The modules `sql.h` and `sql.cpp` are specific for this ODBC branch, but the API is very similar to those in the master branch, in fact the ODBC module is a superset, with very few additional functions declared in `sql.h` and implemented in `sql.cpp`, the interface defined in the namespace sql:: is basically the same for both branches, the code implementing WebAPIs won't "feel" the difference.
+The `login.cpp` module depends on sql.h/sql.cpp, it invokes the `cpp_dblogin` stored procedure and returns a data structure with the values returned by the resultset, the Login API, prebuilt into server.h uses this module and also jwt, if the login was successful then a JSON web token must be returned as part of the JSON response.
 
 ```
 namespace login
@@ -1177,21 +1120,31 @@ namespace login
 	struct login_result
 	{
 		public:
-			login_result(bool _result, const std::string& _name, const std::string& _mail,const std::string& _roles) noexcept;
+			login_result(bool _result, 
+				const std::string& _name, 
+				const std::string& _mail, 
+				const std::string& _roles, 
+				const std::string& _error_code,
+				const std::string& _error_description
+				) noexcept;
 			std::string get_email() const noexcept;
 			std::string get_display_name() const noexcept;
 			std::string get_roles() const noexcept;
+			std::string get_error_code() const noexcept;
+			std::string get_error_description() const noexcept;
 			bool ok() const noexcept;
 		private:
 			bool result;
 			std::string display_name;
 			std::string email;
 			std::string roles;
+			std::string error_code;
+			std::string error_description;
 	};	
 	login_result bind(const std::string& login, const std::string& password);
 }
 ```
-Any variant of the login mechanism, like `loginldap` module, must implement the same interface.
+Any variant of the login mechanism must implement the same interface shown above.
 
 In the case of `login.cpp` its current implementation is very simple, it depends on the expected behavior of the `cpp_dblogin` stored procedure:
 ```
@@ -1200,10 +1153,11 @@ In the case of `login.cpp` its current implementation is very simple, it depends
 	login_result bind(const std::string& login, const std::string& password)
 	{
 		std::string sql {std::format("execute cpp_dblogin '{}', '{}'", login, password)};
-		if (auto rec {sql::get_record("CPP_LOGINDB", sql)}; !rec.empty()) {
-			return login_result {true, rec["displayname"], rec["email"], rec["rolenames"]};
+		auto rec {sql::get_record("CPP_LOGINDB", sql)};
+		if (rec["status"] == "OK") {
+			return login_result {true, rec["displayname"], rec["email"], rec["rolenames"], "", ""};
 		} else
-			return login_result{false, "", "", ""};
+			return login_result{false, "", "", "", rec["error_code"], rec["error_description"]};
 	}
 ```
 
@@ -1213,62 +1167,3 @@ The implementation of JWT (JSON Web Token) and the mechanism of checking authent
 
 It is possible to change the implementation of the `bind()` function if you are not using hashed passwords that can be generated via SQL functions (like in this default implementation), maybe you are using BCrypt or something similar, in any case, the modifications are simple and we can provide support, just open an issue on GitHub. In the specific case of BCrypt, we already have a login implementation using a C-compiled library for BCrypt for x86-64.
 
-### Retrieving JSON
-
-There are very few differences between the ODBC and the PgSQL version of API-Server++, mainly in the `sql` module, because PgSQL is very powerful returning JSON straight from the database, and API-Server++ takes advantage of that. With the ODBC version the `sql` module has the same interface, but in the implementation, it retrieves the resultset from the database and proceeds to assemble the JSON response in memory, there is also an overload of the `sql::get_json_response()` for the cases when multiple resultsets are returned, here is an example that returns customer and orders in a single JSON response:
-
-```
-	server::register_webapi
-	(
-		server::webapi_path("/api/customer/info"), 
-		"Retrieve customer record and the list of his purchase orders",
-		http::verb::GET, 
-		{{"customerid", http::field_type::STRING, true}}, 	
-		{"customer_access", "sysadmin"},
-		[](http::request& req)
-		{
-			auto sql {req.get_sql("execute sp_customer_info $customerid")};
-			req.response.set_body(sql::get_json_response("DB1", sql, {"customer", "orders"}));
-		}
-	);
-```
-
-A stored procedure that returns a resultset looks like this:
-```
-CREATE procedure [dbo].[sp_shippers_view] as
-begin
-	set nocount on
-		SELECT 
-			shipperid,
-			companyname,
-			phone
-		FROM 
-			shippers WITH (NOLOCK)
-end
-```
-The `set nocount on` is important.
-
-### Running API-Server++ and connecting via ODBC
-
-In the apiserver directory, make the script executable
-```
-chmod +x run
-```
-
-Edit the run script
-```
-nano run
-```
-
-Locate these lines and change attributes according to your environment:
-```
-# ODBC SQL authenticator config
-export CPP_LOGINDB="Driver=FreeTDS;SERVER=demodb.mshome.net;PORT=1433;DATABASE=testdb;UID=sa;PWD=basica;APP=CPPServer;Encryption=off;ClientCharset=UTF-8"
-# ODBC SQL data sources
-export DB1="Driver=FreeTDS;SERVER=demodb.mshome.net;PORT=1433;DATABASE=demodb;UID=sa;PWD=basica;APP=CPPServer;Encryption=off;ClientCharset=UTF-8"
-```
-CPP_LOGINDB is the database where the security tables and the stored procedure `cpp_dblogin` reside.
-
-## Differences between PostgreSQL and ODBC versions
-
-PostgreSQL SQL functions return JSON from queries, except for specific cases that return a single record as a resultset, when using ODBC (SQL Server/DB2) the stored procedures will return resultsets, API-Server++ ODBC can only invoke stored procedures that return resultsets or return nothing, it does not support output parameters, only resultsets. For the PgSQL version, the rule is to return JSON, a single-row resultset, or return nothing, only SQL functions return JSON or resultsets in PgSQL, stored procedures can't return resultsets in PgSQL unlike SQL Server or DB2.
