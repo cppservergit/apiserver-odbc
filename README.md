@@ -659,8 +659,8 @@ make
 
 Expected output:
 ```
-g++-13 -Wno-unused-parameter -Wpedantic -Wall -Wextra -O3 -std=c++23 -pthread -flto=6 -fno-extern-tls-init -march=native -mtune=intel -I/usr/include/postgresql -c src/main.cpp
-g++-13 -Wno-unused-parameter -Wpedantic -Wall -Wextra -O3 -std=c++23 -pthread -flto=6 -fno-extern-tls-init -march=native -mtune=intel env.o logger.o jwt.o httputils.o sql.o login.o server.o main.o -lpq -lcurl -lcrypto -o "apiserver"
+g++-13 -Wno-unused-parameter -Wpedantic -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel -I/usr/include/postgresql -c src/main.cpp
+g++-13 -Wno-unused-parameter -Wpedantic -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel  env.o logger.o jwt.o httputils.o email.o odbcutil.o sql.o login.o util.o main.o -lodbc -lcurl -lcrypto -o "apiserver"
 ```
 
 Run the new version:
@@ -678,63 +678,12 @@ The program log should contain these lines at the beginning:
 You new API has been registered and is ready for testing, you can use your HTML page, test.html, just add these lines to the tester code:
 ```
 		call_api("/api/customer/info?customerid=BOLID", function(json) {
-					console.table(json.data.customer); 
-					console.table(json.data.orders); 
-				});
-```
-We know that the SQL function returns 2 resultsets (JSON arrays) with specific names `customer` and `orders`, because of that we know how to properly show the response. In other words, we must have this knowledge in order to process the response, many of these SQL functions will return a single JSON array named `data`, but for the case of more than one resultset, `data` becomes the wrapper field of the inner JSON arrays.
-
-This is the JSON response for this case:
-```
-{
-	"status": "OK",
-	"data": {
-		"customer": [{
-			"customerid": "BOLID",
-			"contactname": "Martín Sommer",
-			"companyname": "Bólido Comidas preparadas",
-			"city": "Madrid",
-			"country": "Spain",
-			"phone": "(91) 555 22 82"
-		}],
-		"orders": [{
-			"orderid": 10326,
-			"orderdate": "1994-11-10",
-			"shipcountry": "Spain",
-			"shipper": "United Package",
-			"total": 982
-		}, {
-			"orderid": 10801,
-			"orderdate": "1996-01-29",
-			"shipcountry": "Spain",
-			"shipper": "United Package",
-			"total": 3026.85
-		}, {
-			"orderid": 10970,
-			"orderdate": "1996-04-23",
-			"shipcountry": "Spain",
-			"shipper": "Speedy Express",
-			"total": 224
-		}]
-	}
-}
-```
-
-If you want to view the raw JSON response just add this line to your Javascript test handler:
-```
-console.log(JSON.stringify(json));
-```
-
-Example:
-```
-		call_api("/api/customer/info?customerid=BOLID", function(json) {
 					console.log(JSON.stringify(json));
-					console.table(json.data.customer); 
-					console.table(json.data.orders); 
 				});
 ```
+The response is the same JSON document shown above
 
-## API Examples
+## Additional API Examples
 
 The TestDB database has many functions that return JSON and can be used to create APIs, but also stored procedures that modify data (insert/update/delete) and won't return JSON, just execute SQL that should not return any results. There is an example of main.cpp with all the API definitions for this sample database, also an HTML5/CCS3 web responsive frontend to consume these APIs, more on this later. In the following sections you will find different types of Web API definitions, using more features than the examples above.
 
