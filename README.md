@@ -547,44 +547,43 @@ export CPP_HTTP_LOG=0
 ```
 __Note__: warnings, errors, and custom log entries recorded by your APIs cannot be disabled.
 
-## Retrieving multiple resultsets
+## Retrieving a Master/Detail JSON document
 
-Our TestDB backend contains a function that returns a JSON response containing a customer's record and the cutomer's orders given a customer ID:
+In this example, we will use a set of tables to retrieve a customer as the master record and the customer's orders as an array of order records, a single stored procedure will encapsulate all the SQL logic and return the JSON document with all the data.
+
+![image](https://github.com/cppservergit/apiserver-odbc/assets/126841556/278e6802-554c-441d-a2de-26c37a72bed5)
+
+The returned JSON document looks like this, given a customer ID:
+![image](https://github.com/cppservergit/apiserver-odbc/assets/126841556/734376a5-3e17-4370-a75c-e86e4e35ec72)
+
+The DemoDB database contains the stored procedure `sp_customer_get` that returns the JSON response shown above, in a single roundtrip, isolating the API from the specific details of the data model, and also enhancing security by denying access to the data tables to API-Server++ login user, for security sake, a well-architected multi-tier system should never allow direct access to the data tables.
 ```
-CREATE OR REPLACE FUNCTION public.fn_customer_get(id character varying)
-    RETURNS TABLE(json character varying) 
-    LANGUAGE 'plpgsql'
-    COST 100
-    VOLATILE SECURITY DEFINER PARALLEL UNSAFE
-    ROWS 1
+CREATE procedure [dbo].[sp_customer_get](@customerid varchar(10)) as
+begin
 
-AS $BODY$
-	declare q1 varchar;
-	declare q2 varchar;
-	declare q varchar;
-BEGIN
-	select array_to_json(array_agg(row_to_json(t1))) into q1
-	from (select customerid, contactname, companyname, city, country, phone from demo.customers where customerid = id) t1;
- 
-	select array_to_json(array_agg(row_to_json(t2))) into q2
-	from (select orderid, orderdate, shipcountry, shipper, total from vw_custorders where customerid = id order by orderid) t2;
-
- 	if q2 is null then
-		q := '{"customer":' || q1 || ',' || '"orders":[]}';
-	else
-		q := '{"customer":' || q1 || ',' || '"orders":' || q2 || '}';
-	end if;
+	select  
+		c.customerid, c.contactname, c.companyname, c.city, c.country, c.phone,
+		orderid, 
+		orderdate, 
+		shipcountry, 
+		orders.companyname as shipper, 
+		total		
+	from 
+		customers c left join 
+		(select orders.*, shippers.companyname, vw_order_totals.total
+		from orders 
+		inner join shippers on shippers.shipperid = orders.shipvia 
+		inner join vw_order_totals on vw_order_totals.orderid = orders.orderid
+		where orders.customerid = @customerid
+		) orders on orders.customerid = c.customerid
+		where c.customerid = @customerid
+	order by c.customerid, orders.orderid
+	for json auto, WITHOUT_ARRAY_WRAPPER	
 	
-	RETURN QUERY select CAST(q as varchar) as json;
-	return;
-END;
-$BODY$;
-
-ALTER FUNCTION public.fn_customer_get(character varying)
-    OWNER TO postgres;
+end
 ```
 
-This SQL function is quite more verbose than in the HelloWorld example, but the required code in API-Server++ is barely more complex, now we need to define an input parameter to pass to the SQL function (an input rule), that's all.
+This stored procedure is a bit more verbose than the SP used in the HelloWorld example, but the required code in API-Server++ is barely more complex, now we need to define an input parameter and its validation rules to pass to the stored procedure, and that's all, the interaction with the database is protected against SQL injection attacks by API-Server++'s inputs processor.
 
 Stop the server with CTRL-C and edit main.cpp:
 ```
@@ -596,7 +595,7 @@ Add this code right above s.start()
 	s.register_webapi
 	(
 		webapi_path("/api/customer/info"), 
-		"Retrieve customer record and the list of his purchase orders",
+		"Retrieve a customer main record and its related orders",
 		http::verb::GET, 
 		{ /* inputs */
 			{"customerid", http::field_type::STRING, true}
@@ -608,7 +607,7 @@ Add this code right above s.start()
 		}
 	);
 ```
-As you can see, this API expects an input parameter named `customerid`, of type `STRING` and it is required, MUST be included in the invocation as a URI parameter, something like:
+As you can see, this API expects an input parameter named `customerid`, of type `STRING` and it is required, it MUST be included in the invocation as a URI parameter, something like:
 
 ```
 http://YouServer:8080/api/customer/info?customerid=BOLID
@@ -645,7 +644,7 @@ int main()
 		{} /* roles */,
 		[](http::request& req)
 		{
-			req.response.set_body(sql::get_json_response("DB1", req.get_sql("select * from fn_customer_get($customerid)")));
+			req.response.set_body(sql::get_json_response("DB1", req.get_sql("execute sp_customer_get $customerid")));
 		}
 	);
 
