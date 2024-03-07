@@ -1163,7 +1163,7 @@ In the case of `login.cpp` its current implementation is very simple, it depends
 
 The implementation of JWT (JSON Web Token) and the mechanism of checking authentication and authorization depend on the correct implementation of the login interface.
 
-#### Custom login implementations
+### Custom login implementations
 
-It is possible to change the implementation of the `bind()` function if you are not using hashed passwords that can be generated via SQL functions (like in this default implementation), maybe you are using BCrypt or something similar, in any case, the modifications are simple and we can provide support, just open an issue on GitHub. In the specific case of BCrypt, we already have a login implementation using a C-compiled library for BCrypt for x86-64.
+It is possible to change the implementation of the `bind()` function if you are not using hashed passwords that can be generated via SQL functions (like in this default implementation), maybe you are using BCrypt or something similar, in any case, the modifications are simple and we can provide support, just open an issue on GitHub.
 
