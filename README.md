@@ -918,7 +918,7 @@ Example of simple invocation without CC and no attachment:
 		}
 	);
 ```
-You can obtain the currently logged-in user's email using `req.user_info.mail`. The body of the message must be an HTML document that you provide, it must be stored in /var/mail, and it can contain parameter markers corresponding to the input fields, these are used like in the SQL templates: $fieldname. The `send_mail()` function takes care of loading the template and injecting input fields if necessary.
+You can obtain the currently logged-in user's email using `req.user_info.mail`. The body of the message must be an HTML document that you provide, it must be stored in `/var/mail`, and it can contain parameter markers corresponding to the input fields, these are used like in the SQL templates: $fieldname. The `send_mail()` function takes care of loading the template and injecting input fields if necessary.
 
 There is a variant of the `send_mail()` function that accepts a CC argument, and also another one with a single attachment:
 ```
