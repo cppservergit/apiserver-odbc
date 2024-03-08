@@ -148,4 +148,10 @@ namespace jwt
 		else 
 			return std::make_pair(false, user_info());
 	}
+	
+	std::string get_signature(std::string_view message) 
+	{
+		static jwt_config config;
+		return sign(message, config.secret);
+	}
 }

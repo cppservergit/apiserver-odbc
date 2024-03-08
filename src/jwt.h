@@ -34,6 +34,7 @@ namespace jwt
 	
 	std::string get_token(std::string_view username, std::string_view mail, std::string_view roles) noexcept;
 	std::pair<bool, user_info> is_valid(const std::string& token);
+	std::string get_signature(std::string_view message); 
 }
 
 #endif /* JWT_H_ */
