@@ -81,7 +81,7 @@ __Notes__:
 
 API-Server++ requires GCC 13.1 or newer because it does take advantage of the latest C++ 20/23 standard features that are only supported by GCC 13.1 onwards, like `<format>`, `constexpr` strings and functions, ranges, and more. This way API-Server++ achieves an "A" qualification with SonarQube static analyzer, being fully compliant with [C++ Core Guidelines](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines).
 
-### Demo database setup setup
+### Demo database setup
 
 Download backups for SQLServer:
 ```
