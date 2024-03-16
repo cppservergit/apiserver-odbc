@@ -38,7 +38,7 @@ You may change the value of MSSQL_SA_PASSWORD, do not touch the rest of the comm
 ```
 sudo docker run -d --restart unless-stopped --name mssql --network host -v ./sql/data:/var/opt/mssql/data -v ./sql/log:/var/opt/mssql/log -v ./sql/secrets:/var/opt/mssql/secrets -e "ACCEPT_EULA=Y" -e "MSSQL_PID=Developer" -e "MSSQL_SA_PASSWORD=Basica2024" mcr.microsoft.com/mssql/server:2019-latest
 ```
-Wait a few seconds then proceed to next step.
+Please wait a few seconds, then proceed to the next step.
 
 ## Step 6: Verify that SQL Server created the basic data files.
 ```
@@ -115,3 +115,21 @@ Take note of your VM IP address with `ip a` looking for the 2nd or 3rd interface
 Driver=FreeTDS;SERVER=172.22.103.242;PORT=1433;DATABASE=testdb;UID=sa;PWD=Basica2024;APP=API-Server;Encryption=off;ClientCharset=UTF-8
 Driver=FreeTDS;SERVER=172.22.103.242;PORT=1433;DATABASE=demodb;UID=sa;PWD=Basica2024;APP=API-Server;Encryption=off;ClientCharset=UTF-8
 ```
+By default API-Server++ uses FreeTDS ODBC Driver, it works for SQL Server and Sybase.
+
+Suppose you want to use the latest Microsoft ODBC Driver for Linux, the native SQL Server client API, in that case, you need Ubuntu 23.04 to use it with API-Server++ because it is currently unavailable on more recent Ubuntu versions like Mantis or Noble. As soon as it becomes available on Ubuntu Noble 24.04, this would be the recommended server platform for API-Server++.
+The connection string for the Microsoft Driver is this:
+```
+Driver=ODBC Driver 18 for SQL Server;SERVER=172.22.103.242;PORT=1433;Database=demodb;Uid=sa;Pwd=Basica2024;APP=API-Server;Encrypt=no;
+```
+We suggest using Microsoft's driver when possible, it's a direct native client. Using encryption is possible with both drivers, we disable it by default for development, troubleshooting encryption configuration between the client and the SQL Server is beyond the scope of this guide, but here are some useful references from the official drivers' documentation.
+* [Troubleshooting encryption with the Microsoft driver](https://learn.microsoft.com/en-us/sql/connect/odbc/connection-troubleshooting?view=sql-server-ver16)
+* [Free TDS ODBC connection properties](https://www.freetds.org/userguide/freetdsconf.html) Look for table 3.3 at the end of the document.
+
+### Executing clean backups in SQL Server 2019
+
+It's necessary to perform a backup with the overwrite option, otherwise, when you restore you may see old data, and your backup file keeps growing, you can specify this option when using Microsoft's GUI tool Management Studio, but you can also do it via SQL or command line with `sqlcmd` using:
+```
+backup database demodb to disk='/var/opt/mssql/data/demodb.bak' with INIT
+```
+It is also desirable to shrink your database before executing the backup using the [DBCC SHRINKDATABASE](https://learn.microsoft.com/en-us/sql/t-sql/database-console-commands/dbcc-shrinkdatabase-transact-sql?view=sql-server-ver16) SQL command.
