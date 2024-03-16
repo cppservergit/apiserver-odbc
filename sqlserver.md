@@ -10,6 +10,8 @@ multipass shell sqlserver
 ```
 These parameters are enough to run a few small demo databases. Add more disk space if necessary.
 
+__Just in case__: [Install Multipass on your system](https://multipass.run/install)
+
 ## Step 1: Install tree
 This software will let you see the full directory structure and verify that SQL Server filled it with its data/log files.
 ```
