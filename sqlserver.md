@@ -107,4 +107,11 @@ sudo docker exec -it mssql /opt/mssql-tools/bin/sqlcmd -S localhost \
 
 That's it, your SQL Server should be ready to accept connections.
 
+## Notes
 
+### ODBC connection strings
+Take note of your VM IP address with `ip a` looking for the 2nd or 3rd interface, if you are using more than one bridge, as would be the case if you combine multipass with an LXD bridge when using only multipass then it should be the 2nd interface, usually this will be the same for a VM created with another Ubuntu virtualization software:
+```
+Driver=FreeTDS;SERVER=172.22.103.242;PORT=1433;DATABASE=testdb;UID=sa;PWD=Basica2024;APP=API-Server;Encryption=off;ClientCharset=UTF-8
+Driver=FreeTDS;SERVER=172.22.103.242;PORT=1433;DATABASE=demodb;UID=sa;PWD=Basica2024;APP=API-Server;Encryption=off;ClientCharset=UTF-8
+```
