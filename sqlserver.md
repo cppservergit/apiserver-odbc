@@ -129,9 +129,23 @@ We suggest using Microsoft's driver when possible, it's a direct native client. 
 You may have noticed that we include the `APP` attribute on the connection string, this is useful to monitor API-Server++ connections on the server.
 
 ### Executing clean backups in SQL Server 2019
-
 It's necessary to perform a backup with the overwrite option, otherwise, when you restore you may see old data, and your backup file keeps growing, you can specify this option when using Microsoft's GUI tool Management Studio, but you can also do it via SQL or command line with `sqlcmd` using:
 ```
 backup database demodb to disk='/var/opt/mssql/data/demodb.bak' with INIT
 ```
 It is also desirable to shrink your database before executing the backup using the [DBCC SHRINKDATABASE](https://learn.microsoft.com/en-us/sql/t-sql/database-console-commands/dbcc-shrinkdatabase-transact-sql?view=sql-server-ver16) SQL command.
+
+### Using the SQL command line console inside the docker container
+It might be the case that your docker container is not visible to remote GUI clients, this would be the case if you installed it in a multipass VM and then you want to connect from a remote machine, the VM won't be visible by default when using Multipass unless you configured a bridge for that purpose. In those cases, you can enter a terminal session inside your docker container, right from the VM of course:
+```
+sudo docker exec -it mssql /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P 'Basica2024'
+```
+After executing this command, you are inside sqlcmd running in your docker container, you can execute SQL commands like this:
+```
+use demodb
+go
+select top 1 companyname from customers
+go
+use master
+sp_databases
+```
