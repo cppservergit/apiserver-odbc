@@ -92,7 +92,7 @@ curl https://cppserver.com/files/apiserver/demodb.bak -O
 
 Please restore these backups in your SQLServer development instance, DemoDB contains several tables to exercise different kinds of APIs, while TestDB contains the minimal security tables and the stored procedure `cpp_dblogin` to support an SQL-based login mechanism and lets you test API-Server++ JWT (JSON web token) implementation quickly. You can use your database for API testing, but for security purposes, TestDB is required for quick testing of API-Servr++ but it can be replaced later by your own security DB, as long as you provide a compatible `cpp_dblogin` stored procedure, more details will be provided in a forward section of this README.
 
-If you want a quick SQL Server installation on docker please visit our [step-by-step guide](https://github.com/cppservergit/apiserver-odbc/blob/main/sqlserver.md) to create this setup and restore the demo databases mentioned above:
+If you want a quick SQL Server installation on docker please visit our [tutorial](https://github.com/cppservergit/apiserver-odbc/blob/main/sqlserver.md) to create this setup and restore the demo databases mentioned above:
 
 ## Build
 
