@@ -126,6 +126,8 @@ We suggest using Microsoft's driver when possible, it's a direct native client. 
 * [Troubleshooting encryption with the Microsoft driver](https://learn.microsoft.com/en-us/sql/connect/odbc/connection-troubleshooting?view=sql-server-ver16)
 * [Free TDS ODBC connection properties](https://www.freetds.org/userguide/freetdsconf.html) Look for table 3.3 at the end of the document.
 
+You may have noticed that we include the `APP` attribute on the connection string, this is useful to monitor API-Server++ connections on the server.
+
 ### Executing clean backups in SQL Server 2019
 
 It's necessary to perform a backup with the overwrite option, otherwise, when you restore you may see old data, and your backup file keeps growing, you can specify this option when using Microsoft's GUI tool Management Studio, but you can also do it via SQL or command line with `sqlcmd` using:
