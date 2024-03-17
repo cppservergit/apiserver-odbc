@@ -22,6 +22,7 @@ sudo apt update && sudo apt install tree
 ```
 curl -fsSL https://get.docker.com -o get-docker.sh && sh get-docker.sh && sudo sh get-docker.sh
 ```
+This may take a few minutes to complete.
 
 ## Step 3: Pull SQL Server 2019 image for docker
 This may take a few minutes, it is a large image.
