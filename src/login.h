@@ -43,7 +43,7 @@ namespace login
 			std::string error_code;
 			std::string error_description;
 	};	
-	login_result bind(const std::string& login, const std::string& password);
+	login_result bind(const std::string& login, const std::string& password, const std::string& session_id, const std::string& remote_ip);
 }
 
 #endif /* LOGIN_H_ */

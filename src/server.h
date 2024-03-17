@@ -47,7 +47,7 @@
 #include "jwt.h"
 #include "email.h"
 
-constexpr char SERVER_VERSION[] = "API-Server++ v1.0.7";
+constexpr char SERVER_VERSION[] = "API-Server++ v1.0.8";
 constexpr const char* LOGGER_SRC {"server"};
 
 struct webapi_path
@@ -275,10 +275,13 @@ struct server
 
 		auto start = std::chrono::high_resolution_clock::now();
 
-		if (!req.internals.errcode) {
+		if (!req.internals.errcode && !req.payload.empty()) {
 			process_request(req, api);
-		} else
-			send_error(req, 400, "Bad request");
+		} else {
+			if (req.payload.empty())
+				logger::log("service", "error", "HTTP 1/1 pipeline error, request is empty"));
+			send_error(req, 400, "Bad request"); 
+		}
 		
 		auto finish = std::chrono::high_resolution_clock::now();
 		std::chrono::duration <double>elapsed = finish - start;				
@@ -382,7 +385,10 @@ struct server
 				event.data.ptr = &req;
 			} else {
 				auto [iter, success] {buffers.try_emplace(fd, epoll_fd, fd, remote_ip)};
-				event.data.ptr = &iter->second;
+				if (success)
+					event.data.ptr = &iter->second;
+				else
+					logger::log("epoll", "error", std::format("error creating a new request object into the hashmap with fd: {}", fd));
 			}
 			event.events = EPOLLIN | EPOLLET | EPOLLRDHUP;
 			epoll_ctl(epoll_fd, EPOLL_CTL_ADD, fd, &event);
@@ -601,14 +607,15 @@ struct server
 			{
 				std::string login{req.get_param("username")};
 				std::string password{req.get_param("password")};
-				if (const auto lr {login::bind(login, password)}; lr.ok()) {
-					const std::string token {jwt::get_token(login, lr.get_email(), lr.get_roles())};
+				const std::string sid {http::get_uuid()};
+				if (const auto lr {login::bind(login, password, sid, req.remote_ip)}; lr.ok()) {
+					const std::string token {jwt::get_token(sid, login, lr.get_email(), lr.get_roles())};
 					constexpr auto json {R"({{"status":"OK","data":[{{"displayname":"{}","token_type":"bearer","id_token":"{}"}}]}})"};
 					const std::string login_ok {std::format(json, lr.get_display_name(), token)};
 					req.response.set_body(login_ok);
 					if (env::login_log_enabled())
 						logger::log("security", "info", 
-							std::format("login OK - user: {} IP: {} token: {} roles: {}", login, req.remote_ip, token, lr.get_roles()));
+							std::format("login OK - SID: {} user: {} IP: {} token: {} roles: {}", sid, login, req.remote_ip, token, lr.get_roles()));
 				} else {
 					logger::log("security", "warn", std::format("login failed - user: {} IP: {}", login, req.remote_ip));
 					constexpr auto json = R"({{"status":"INVALID","validation":{{"id":"login","code":"{}","description":"{}"}}}})";

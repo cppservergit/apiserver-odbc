@@ -156,7 +156,7 @@ namespace http
 
 	struct socket_buffer {
 	private:
-		constexpr static int _buffer_size {8192};
+		constexpr static int _buffer_size {2048};
 		constexpr static double _threshold {0.75};
 		std::vector<char> _buffer;
 		int _pos{0};

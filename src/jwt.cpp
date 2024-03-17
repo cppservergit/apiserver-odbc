@@ -112,6 +112,7 @@ namespace
 	{
 		auto fields {json::parse(payload)};
 		return jwt::user_info {
+				fields["sid"], 
 				fields["login"], 
 				fields["mail"], 
 				fields["roles"], 
@@ -122,12 +123,12 @@ namespace
 
 namespace jwt
 {
-	std::string get_token(std::string_view username, std::string_view mail, std::string_view roles) noexcept
+	std::string get_token(std::string_view sessionid, std::string_view username, std::string_view mail, std::string_view roles) noexcept
 	{
 		static jwt_config config;
 		const time_t now {std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()) + config.duration}; 
 		const std::string json_header {R"({"alg":"HS256","typ":"JWT"})"};
-		const std::string json_payload {std::format(R"({{"login":"{}","mail":"{}","roles":"{}","exp":{}}})", username, mail, roles, now)};
+		const std::string json_payload {std::format(R"({{"sid":"{}","login":"{}","mail":"{}","roles":"{}","exp":{}}})", sessionid, username, mail, roles, now)};
 		std::string buffer {base64_encode(json_header) + "." + base64_encode(json_payload)};
 		auto signature {sign(buffer, config.secret)};
 		return buffer.append(".").append(signature);

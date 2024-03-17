@@ -43,9 +43,9 @@ namespace login
 	
 	//login and password must be pre-processed for sql-injection protection
 	//expects a resultset with these columns: mail, displayname, rolenames
-	login_result bind(const std::string& login, const std::string& password)
+	login_result bind(const std::string& login, const std::string& password, const std::string& session_id, const std::string& remote_ip)
 	{
-		std::string sql {std::format("execute cpp_dblogin '{}', '{}'", login, password)};
+		std::string sql {std::format("cpp_dblogin '{}', '{}', '{}', '{}'", login, password, session_id, remote_ip)};
 		auto rec {sql::get_record("CPP_LOGINDB", sql)};
 		if (rec["status"] == "OK") {
 			return login_result {true, rec["displayname"], rec["email"], rec["rolenames"], "", ""};

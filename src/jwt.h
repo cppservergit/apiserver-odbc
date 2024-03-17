@@ -26,13 +26,14 @@ namespace jwt
 {
 	struct user_info 
 	{
+		std::string sessionid;
 		std::string login;
 		std::string mail;
 		std::string roles;
 		time_t exp{0};
 	};
 	
-	std::string get_token(std::string_view username, std::string_view mail, std::string_view roles) noexcept;
+	std::string get_token(std::string_view sessionid, std::string_view username, std::string_view mail, std::string_view roles) noexcept;
 	std::pair<bool, user_info> is_valid(const std::string& token);
 	std::string get_signature(std::string_view message); 
 }
