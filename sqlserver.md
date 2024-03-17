@@ -3,7 +3,7 @@
 Let's assume that you have a brand-new Ubuntu 22.04 virtual machine, if it was created with multipass you will use the `ubuntu` user and its `/home/ubuntu` directory.
 Please login to this VM and make sure you are in your home directory.
 
-When using multipass you can create it with this command:
+When using multipass you can create the VM with this command:
 ```
 multipass launch -n sqlserver -c 4 -m 4G -d 12G
 multipass shell sqlserver
