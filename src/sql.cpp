@@ -162,16 +162,15 @@ namespace
 	std::string read_json(SQLHSTMT hstmt) {
 		std::string json;
 		json.reserve(16383);
-		SQLLEN numRows{0};
-		SQLRowCount(hstmt, &numRows);
-		if (numRows) {
-			std::array<SQLCHAR, 8192> blob;
-			SQLLEN bytes_read{0};
-			while (SQLFetch(hstmt) != SQL_NO_DATA) {
-				SQLGetData(hstmt, 1, SQL_C_CHAR, blob.data(), blob.size(), &bytes_read);
-				json.append(std::bit_cast<char*>(blob.data()));
-			}
-		} else
+		int numRows{0};
+		std::array<SQLCHAR, 8192> blob;
+		SQLLEN bytes_read{0};
+		while (SQLFetch(hstmt) != SQL_NO_DATA) {
+			numRows++;
+			SQLGetData(hstmt, 1, SQL_C_CHAR, blob.data(), blob.size(), &bytes_read);
+			json.append(std::bit_cast<char*>(blob.data()));
+		}
+		if (!numRows)
 			json.append("null");
 		return json;
 	}
