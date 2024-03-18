@@ -279,7 +279,7 @@ struct server
 			process_request(req, api);
 		} else {
 			if (req.payload.empty())
-				logger::log("service", "error", "HTTP 1/1 pipeline error, request is empty"));
+				logger::log("service", "error", "HTTP 1/1 pipeline error, request is empty");
 			send_error(req, 400, "Bad request"); 
 		}
 		
