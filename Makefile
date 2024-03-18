@@ -3,9 +3,9 @@ DATE=$(shell printf '%(%Y%m%d)T')
 CC=g++-13
 CC_OPTS=-Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel
 CC_LIBS=-lodbc -lcurl -lcrypto -luuid -ljson-c
-CC_OBJS=env.o logger.o jwt.o httputils.o email.o odbcutil.o sql.o login.o util.o main.o
+CC_OBJS=env.o logger.o jwt.o httputils.o email.o pkeyutil.o odbcutil.o sql.o login.o util.o main.o
 
-apiserver: env.o logger.o jwt.o httputils.o email.o odbcutil.o sql.o login.o util.o main.o
+apiserver: env.o logger.o jwt.o httputils.o email.o pkeyutil.o odbcutil.o sql.o login.o util.o main.o
 	$(CC) $(CC_OPTS) $(CC_OBJS) $(CC_LIBS) -o "apiserver"
 
 main.o: src/main.cpp src/server.h
