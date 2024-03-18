@@ -16,7 +16,7 @@ int main()
 		http::verb::GET, 
 		[](http::request& req) 
 		{
-			req.response.set_body(sql::get_json_response("DB1", "sp_shipper_view"));
+			req.response.set_body(sql::get_json_response("DB1", "sp_shippers_view"));
 		}
 	);
 	
@@ -270,7 +270,7 @@ Add this code below `server s;` and right above `s.start();`:
 		{} /* roles */,
 		[](http::request& req) 
 		{
-			req.response.set_body(sql::get_json_response("DB1", "sp_shipper_view"));
+			req.response.set_body(sql::get_json_response("DB1", "sp_shippers_view"));
 		}
 	);
 ```
