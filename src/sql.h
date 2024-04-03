@@ -24,6 +24,7 @@
 #include <format>
 #include <tuple>
 #include <unordered_map>
+#include <algorithm>
 #include "util.h"
 #include "logger.h"
 #include "env.h"

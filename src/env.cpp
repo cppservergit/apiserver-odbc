@@ -39,8 +39,8 @@ namespace env
 		if (const char* env_p = std::getenv(name.c_str())) {
 			std::string value{env_p};
 			if (value.ends_with(".enc")) {
-				if (auto result{decrypt(value)}; result.first) {
-					value = result.second;
+				if (auto [success, decrypted]{decrypt(value)}; success) {
+					value = decrypted;
 				} else
 					logger::log(LOGGER_SRC, "error", std::format("get_str() -> encrypted file not found: {} env-var: {}", value, name));
 			}

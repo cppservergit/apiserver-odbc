@@ -79,6 +79,18 @@ struct webapi_path
 		std::string_view m_path;
 };
 
+constexpr void audit_task(auto& params) noexcept
+{
+		constexpr auto tpl {"sp_audit_trail '{}', '{}', '{}','{}', '{}', '{}', '{}'"};
+		const auto sql {std::format(tpl, 	params.path, params.username, params.remote_ip, 
+											params.payload, params.sessionid, params.useragent, params.nodename)};
+		try {
+			sql::exec_sql("CPP_AUDITDB", sql);
+		} catch (const sql::database_exception& e) {
+			logger::log("audit", "error", std::format("could not save audit record in database: {}", e.what()));
+		}
+};
+
 constexpr auto audit = [](std::stop_token tok, auto srv) noexcept 
 {
 	logger::log("pool", "info", "starting audit thread");
@@ -99,16 +111,7 @@ constexpr auto audit = [](std::stop_token tok, auto srv) noexcept
 		srv->m_audit_queue.pop();
 		lock.unlock();
 		
-		//run task
-		constexpr auto tpl {"sp_audit_trail '{}', '{}', '{}','{}', '{}', '{}', '{}'"};
-		const auto sql {std::format(tpl, 	params.path, params.username, params.remote_ip, 
-											params.payload, params.sessionid, params.useragent, params.nodename)};
-		try {
-			sql::exec_sql("CPP_AUDITDB", sql);
-		} catch (const sql::database_exception& e) {
-			logger::log("audit", "error", std::format("could not save audit record in database: {}", e.what()));
-		}
-		
+		audit_task(params);
 	}
 	
 	//ending task - free resources

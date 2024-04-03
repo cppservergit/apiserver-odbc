@@ -270,7 +270,6 @@ namespace
 
 	inline void retry(RETCODE rc, const std::string& dbname, dbutil& db, int& retries, const std::string& sql)
 	{
-		//auto [error_code, sqlstate, error_msg] {get_error_info(db.hstmt)};
 		auto [error_code, sqlstate, error_msg] {get_error_info(db.henv, db.hdbc, db.hstmt)};
 		if (sqlstate == "01000" || sqlstate == "08S01" || rc == SQL_INVALID_HANDLE) {
 			if (retries == max_retries) {
@@ -399,7 +398,7 @@ namespace sql
 	
 	std::vector<recordset> get_rs(const std::string& dbname, const std::string &sql)
 	{
-		auto _loop = [](SQLHSTMT& hstmt, std::vector<recordset>& vec) {
+		auto _loop = [](const SQLHSTMT& hstmt, std::vector<recordset>& vec) {
 			do {
 				vec.push_back(get_recordset(hstmt));
 			} while (SQLMoreResults(hstmt) == SQL_SUCCESS);
@@ -416,12 +415,8 @@ namespace sql
 	
 	std::string rs_to_json(const recordset& rs, const std::vector<std::string>& numeric_fields)
 	{
-		auto contains = [&numeric_fields](auto to_find) -> bool {
-			if (numeric_fields.empty())
-				return false;
-			for (const auto& name: numeric_fields) 
-				if (name == to_find) return true;
-			return false;
+		auto contains = [&numeric_fields](const auto& to_find) {
+			return std::ranges::any_of(numeric_fields, [&to_find](const auto& v){return v == to_find;});
 		};
 		
 		std::string json;
@@ -431,10 +426,7 @@ namespace sql
 			json.append("{");
 			for (const auto&[key, value]: rec) {
 				if (contains(key))
-					if (!value.empty())
-						json.append(std::format(R"("{}":{},)", key, value));
-					else 
-						json.append(std::format(R"("{}":null,)", key, value));
+					json.append(std::format(R"("{}":{},)", key, value.empty() ? value : "null"));
 				else
 					json.append(std::format(R"("{}":"{}",)", key, util::encode_json(value)));
 			}
