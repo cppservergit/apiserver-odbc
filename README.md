@@ -62,7 +62,7 @@ sudo apt update
 
 Install required packages:
 ```
-sudo apt install g++-13 libssl-dev libcurl4-openssl-dev uuid-dev libjson-c-dev libldap-dev unixodbc-dev tdsodbc make -y --no-install-recommends
+sudo apt install g++-13 libssl-dev libcurl4-openssl-dev uuid-dev libjson-c-dev unixodbc-dev tdsodbc make -y --no-install-recommends
 ```
 
 Optionally, if your VM has enough disk space (10GB) you can upgrade the rest of the operating system, it may take some minutes and require a restart of the VM:
