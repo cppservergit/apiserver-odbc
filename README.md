@@ -121,7 +121,7 @@ g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march
 g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel -c src/login.cpp
 g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel -DCPP_BUILD_DATE=20230807 -c src/server.cpp
 g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel -c src/main.cpp
-g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel env.o logger.o jwt.o httputils.o email.o httplib.o pkeyutil.o odbcutil.o sql.o util.o main.o -lodbc -lcurl -lcrypto -luuid -ljson-c -o "apiserver"
+g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel env.o logger.o jwt.o httputils.o email.o pkeyutil.o odbcutil.o sql.o util.o main.o -lodbc -lcurl -lcrypto -luuid -ljson-c -o "apiserver"
 ```
 
 ## Run API-Server++
@@ -321,7 +321,7 @@ make
 Expected output:
 ```
 g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=native -mtune=intel -DCPP_BUILD_DATE=20240306 -c src/main.cpp
-g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=native -mtune=intel env.o logger.o jwt.o httputils.o email.o httplib.o pkeyutil.o odbcutil.o sql.o util.o main.o -lodbc -lcurl -lcrypto -luuid -ljson-c -o "apiserver"
+g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=native -mtune=intel env.o logger.o jwt.o httputils.o email.o pkeyutil.o odbcutil.o sql.o util.o main.o -lodbc -lcurl -lcrypto -luuid -ljson-c -o "apiserver"
 ```
 
 Now run the server again:
@@ -656,8 +656,8 @@ make
 
 Expected output:
 ```
-g++-13 -Wno-unused-parameter -Wpedantic -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel -I/usr/include/postgresql -c src/main.cpp
-g++-13 -Wno-unused-parameter -Wpedantic -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel  env.o logger.o jwt.o httputils.o email.o odbcutil.o sql.o login.o util.o main.o -lodbc -lcurl -lcrypto -o "apiserver"
+g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel -c src/main.cpp
+g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=native -mtune=intel env.o logger.o jwt.o httputils.o email.o pkeyutil.o odbcutil.o sql.o util.o main.o -lodbc -lcurl -lcrypto -luuid -ljson-c -o "apiserver"
 ```
 
 Run the new version:
