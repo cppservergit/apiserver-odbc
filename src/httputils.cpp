@@ -164,8 +164,14 @@ namespace
 
 	constexpr std::string replace_params(auto req, std::string body)
 	{
-		if (std::size_t pos = body.find("$userlogin"); pos != std::string::npos)
-			body.replace(pos, std::string("$userlogin").length(), req->user_info.login);
+		const std::string userlogin_marker{"$userlogin"};
+		if (std::size_t pos = body.find(userlogin_marker); pos != std::string::npos)
+			body.replace(pos, userlogin_marker.size(), "'" + req->user_info.login + "'");
+
+		const std::string sessionid_marker{"$sessionid"};
+		if (std::size_t pos = body.find(sessionid_marker); pos != std::string::npos)
+			body.replace(pos, sessionid_marker.size(), "'" + req->user_info.sessionid + "'");
+		
 		if (req->input_rules.empty())
 			return body;
 		for (const auto& p:req->input_rules)
@@ -640,8 +646,12 @@ namespace http
 	{
 		if (input_rules.empty())
 			return sql;
-		if (std::size_t pos = sql.find("$userlogin"); pos != std::string::npos)
-			sql.replace(pos, std::string("$userlogin").length(), "'" + user_info.login + "'");
+		const std::string userlogin_marker{"$userlogin"};
+		if (std::size_t pos = sql.find(userlogin_marker); pos != std::string::npos)
+			sql.replace(pos, userlogin_marker.size(), "'" + user_info.login + "'");
+		const std::string sessionid_marker{"$sessionid"};
+		if (std::size_t pos = sql.find(sessionid_marker); pos != std::string::npos)
+			sql.replace(pos, sessionid_marker.size(), "'" + user_info.sessionid + "'");
 		for (const auto& p:input_rules)
 		{
 			std::string name {"$" + p.get_name()};

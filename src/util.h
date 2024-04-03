@@ -3,6 +3,7 @@
 
 #include <chrono>
 #include <format>
+#include <sstream>
 
 namespace util
 {
@@ -23,6 +24,8 @@ namespace util
 
 	//return date as yyyy-mm-dd
 	std::string today() noexcept;
+	
+	std::string encode_json(const std::string& s);
 }
 
 #endif /* UTILS_H_ */

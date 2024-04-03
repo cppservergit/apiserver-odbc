@@ -12,6 +12,7 @@ namespace
 			unsigned short int login_log{read_env("CPP_LOGIN_LOG", 0)};
 			unsigned short int pool_size{read_env("CPP_POOL_SIZE", 4)};
 			unsigned short int jwt_expiration{read_env("CPP_JWT_EXP", 600)};
+			unsigned short int enable_audit{read_env("CPP_ENABLE_AUDIT", 0)};
 	};	
 
 	const env_vars ev;
@@ -35,11 +36,17 @@ namespace env
 {
 	std::string get_str(const std::string& name) noexcept
 	{
-		if (const char* env_p = std::getenv(name.c_str()))
-			return std::string(env_p);
-		else 
+		if (const char* env_p = std::getenv(name.c_str())) {
+			std::string value{env_p};
+			if (value.ends_with(".enc")) {
+				if (auto result{decrypt(value)}; result.first) {
+					value = result.second;
+				} else
+					logger::log(LOGGER_SRC, "error", std::format("get_str() -> encrypted file not found: {} env-var: {}", value, name));
+			}
+			return value;
+		} else 
 			return "";
-		
 	}
 
 	unsigned short int port() noexcept 
@@ -57,4 +64,7 @@ namespace env
 	unsigned short int jwt_expiration() noexcept 
 	{ return ev.jwt_expiration; }
 
+	unsigned short int enable_audit() noexcept 
+	{ return ev.enable_audit; }
+	
 }

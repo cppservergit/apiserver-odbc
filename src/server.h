@@ -47,7 +47,7 @@
 #include "jwt.h"
 #include "email.h"
 
-constexpr char SERVER_VERSION[] = "API-Server++ v1.0.8";
+constexpr char SERVER_VERSION[] = "API-Server++ v1.1.0";
 constexpr const char* LOGGER_SRC {"server"};
 
 struct webapi_path
@@ -79,6 +79,41 @@ struct webapi_path
 		std::string_view m_path;
 };
 
+constexpr auto audit = [](std::stop_token tok, auto srv) noexcept 
+{
+	logger::log("pool", "info", "starting audit thread");
+	
+	while(!tok.stop_requested())
+	{
+		//prepare lock
+		std::unique_lock lock{srv->m_audit_mutex}; 
+		
+		//release lock, reaquire it if conditions met
+		srv->m_audit_cond.wait(lock, [&tok, &srv]() { return (!srv->m_audit_queue.empty() || tok.stop_requested()); }); 
+		
+		//stop requested?
+		if (tok.stop_requested()) { lock.unlock(); break; }
+		
+		//get task
+		auto params = srv->m_audit_queue.front();
+		srv->m_audit_queue.pop();
+		lock.unlock();
+		
+		//run task
+		constexpr auto tpl {"sp_audit_trail '{}', '{}', '{}','{}', '{}', '{}', '{}'"};
+		const auto sql {std::format(tpl, 	params.path, params.username, params.remote_ip, 
+											params.payload, params.sessionid, params.useragent, params.nodename)};
+		try {
+			sql::exec_sql("CPP_AUDITDB", sql);
+		} catch (const sql::database_exception& e) {
+			logger::log("audit", "error", std::format("could not save audit record in database: {}", e.what()));
+		}
+		
+	}
+	
+	//ending task - free resources
+	logger::log("pool", "info", "stopping audit thread");
+};
 
 constexpr auto consumer = [](std::stop_token tok, auto srv) noexcept 
 {
@@ -153,12 +188,26 @@ struct server
 		const webapi& api;
 	};
 
+	struct audit_trail {
+		std::string username;
+		std::string remote_ip;
+		std::string path;
+		std::string payload;
+		std::string sessionid;
+		std::string useragent;
+		std::string nodename;
+	};
+
 	std::queue<worker_params> m_queue;
 	std::condition_variable m_cond;
 	std::mutex m_mutex;
+	std::condition_variable m_audit_cond;
+	std::queue<audit_trail> m_audit_queue;
+	std::mutex m_audit_mutex;
 	int m_signal {get_signalfd()};
 	
 	std::string pod_name;
+	bool enable_audit {false};
 	
 	std::chrono::time_point<std::chrono::high_resolution_clock> _start_init{};
 	
@@ -214,6 +263,13 @@ struct server
 		);
 	}
 
+	constexpr void save_audit_trail (const audit_trail& at)
+	{
+		std::scoped_lock lock{m_audit_mutex};
+		m_audit_queue.push(at);
+		m_audit_cond.notify_all();		
+	}
+	
 	constexpr void execute_service(http::request& req, const webapi& api)
 	{
 		if (!ip_restrictions.empty() && ip_restrictions.contains(req.path) && !ip_restrictions[req.path].contains(req.remote_ip)) 
@@ -221,8 +277,14 @@ struct server
 		req.enforce(api.verb);
 		if (!api.rules.empty())
 			req.enforce(api.rules);
-		if (api.is_secure)
+		if (api.is_secure) {
 			req.check_security(api.roles);
+			if (enable_audit) {
+				audit_trail at{req.user_info.login, req.remote_ip, req.path, 
+							std::string(req.get_body()), req.user_info.sessionid, req.get_header("user-agent"), pod_name};
+				save_audit_trail(at);
+			}
+		}
 		api.fn(req);
 	}
 
@@ -292,7 +354,7 @@ struct server
 		g_total_time += elapsed.count();
 		++g_counter;
 		--g_active_threads;
-	};
+	}
 
 	constexpr bool read_request(http::request& req, int bytes) noexcept
 	{
@@ -519,6 +581,7 @@ struct server
 		logger::log("env", "info", std::format("login log: {}", env::login_log_enabled()));
 		logger::log("env", "info", std::format("http log: {}", env::http_log_enabled()));
 		logger::log("env", "info", std::format("jwt exp: {}", env::jwt_expiration()));
+		logger::log("env", "info", std::format("enable audit: {}", env::enable_audit()));
 		logger::log("server", "info", std::format("Pod: {} PID: {} starting {}-{}", pod_name, getpid(), SERVER_VERSION, CPP_BUILD_DATE));
 		logger::log("server", "info", std::format("hardware threads: {} GCC: {}", std::thread::hardware_concurrency(), __VERSION__));
 	}
@@ -704,7 +767,7 @@ struct server
 	constexpr void start()
 	{
 		prebuilt_services();
-		
+		enable_audit = env::enable_audit();
 		std::array<char, 128> hostname{0};
 		gethostname(hostname.data(), hostname.size());
 		pod_name.append(hostname.data());
@@ -721,6 +784,9 @@ struct server
 			stops[i] = std::stop_source();
 			pool[i] = std::jthread(consumer, stops[i].get_token(), this);
 		}
+		
+		std::stop_source audit_stop;
+		std::jthread audit_engine(audit, audit_stop.get_token(), this);
 		
 		std::chrono::duration<double> elapsed = std::chrono::high_resolution_clock::now() - _start_init;
 		logger::log("server", "info", std::format("server started in {}s", elapsed.count()));
@@ -740,6 +806,11 @@ struct server
 		
 		for (auto& t:pool)
 			t.join();
+		
+		audit_stop.request_stop();
+		m_audit_cond.notify_all();
+		audit_engine.join();
+		
 	}
 	
 };

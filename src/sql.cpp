@@ -17,6 +17,18 @@ namespace
 		return std::make_pair(sqlErrorMsg, sqlState);
 	}
 
+	std::tuple<SDWORD, std::string, std::string> get_error_info(SQLHENV henv, SQLHDBC hdbc, SQLHSTMT hstmt) noexcept
+	{
+	    std::array<SQLCHAR, 10> szSQLSTATE;
+	    SDWORD nErr;
+		std::array<SQLCHAR, SQL_MAX_MESSAGE_LENGTH + 1> msg;
+	    SWORD cbmsg;
+	    SQLError(henv, hdbc, hstmt, szSQLSTATE.data(), &nErr, msg.data(), msg.size(), &cbmsg);
+		const std::string sqlState {std::bit_cast<char*>(szSQLSTATE.data())};
+		const std::string sqlErrorMsg {std::bit_cast<char*>(msg.data())};
+		return make_tuple(nErr, sqlState, sqlErrorMsg);
+	}
+
 	struct col_info {
 		std::string colname;
 		SQLSMALLINT dataType{0};
@@ -184,8 +196,13 @@ namespace
 			for (auto& col: cols) {
 				json.append("\"").append(col.colname).append("\":");
 				if ( col.dataSize > 0 ) {
-					if (col.dataType==SQL_TYPE_DATE || col.dataType==SQL_VARCHAR || col.dataType==SQL_WVARCHAR || col.dataType==SQL_CHAR) {
-						json.append("\"").append(  std::bit_cast<char*>(&col.data[0]) ).append("\"");
+					if (col.dataType == SQL_TYPE_DATE || 
+						col.dataType==SQL_TYPE_TIMESTAMP || 
+						col.dataType==SQL_TYPE_TIME || 
+						col.dataType==SQL_VARCHAR || 
+						col.dataType==SQL_WVARCHAR || 
+						col.dataType==SQL_CHAR) {
+						json.append("\"").append(util::encode_json(std::bit_cast<char*>(&col.data[0]))).append("\"");
 					} else {
 						json.append( std::bit_cast<char*>(&col.data[0]) );
 					}
@@ -253,7 +270,8 @@ namespace
 
 	inline void retry(RETCODE rc, const std::string& dbname, dbutil& db, int& retries, const std::string& sql)
 	{
-		auto [error, sqlstate] {get_error_msg(db.henv, db.hdbc, db.hstmt)};
+		//auto [error_code, sqlstate, error_msg] {get_error_info(db.hstmt)};
+		auto [error_code, sqlstate, error_msg] {get_error_info(db.henv, db.hdbc, db.hstmt)};
 		if (sqlstate == "01000" || sqlstate == "08S01" || rc == SQL_INVALID_HANDLE) {
 			if (retries == max_retries) {
 				throw sql::database_exception(std::format("retry() -> cannot connect to database:: {}", dbname));
@@ -262,7 +280,7 @@ namespace
 				getdb(dbname, true);
 			}
 		} else {
-			throw sql::database_exception(std::format("db_exec() {} -> sql: {}", error, sql));
+			throw sql::database_exception(std::format("db_exec() Error Code: {} SQLSTATE: {} {} -> sql: {}", error_code, sqlstate, error_msg, sql));
 		}
 	}	
 	
@@ -377,6 +395,55 @@ namespace sql
 		return db_exec<void>(dbname, sql, [](SQLHSTMT hstmt) {
 				SQLFreeStmt(hstmt, SQL_CLOSE);
 		});
+	}
+	
+	std::vector<recordset> get_rs(const std::string& dbname, const std::string &sql)
+	{
+		auto _loop = [](SQLHSTMT& hstmt, std::vector<recordset>& vec) {
+			do {
+				vec.push_back(get_recordset(hstmt));
+			} while (SQLMoreResults(hstmt) == SQL_SUCCESS);
+		};
+		
+		return db_exec <std::vector<recordset>>(dbname, sql, [&_loop](SQLHSTMT hstmt) {
+			std::vector<recordset> vec;
+			_loop(hstmt, vec);
+			SQLFreeStmt(hstmt, SQL_CLOSE);
+			SQLFreeStmt(hstmt, SQL_UNBIND);
+			return vec;
+		});
+	}
+	
+	std::string rs_to_json(const recordset& rs, const std::vector<std::string>& numeric_fields)
+	{
+		auto contains = [&numeric_fields](auto to_find) -> bool {
+			if (numeric_fields.empty())
+				return false;
+			for (const auto& name: numeric_fields) 
+				if (name == to_find) return true;
+			return false;
+		};
+		
+		std::string json;
+		json.reserve(4095);
+		json.append("[");
+		for (const auto& rec: rs) {
+			json.append("{");
+			for (const auto&[key, value]: rec) {
+				if (contains(key))
+					if (!value.empty())
+						json.append(std::format(R"("{}":{},)", key, value));
+					else 
+						json.append(std::format(R"("{}":null,)", key, value));
+				else
+					json.append(std::format(R"("{}":"{}",)", key, util::encode_json(value)));
+			}
+			json.pop_back();
+			json.append("},");
+		}
+		json.pop_back();
+		json.append("]");
+		return json;
 	}
 }
 

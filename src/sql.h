@@ -22,6 +22,7 @@
 #include <sstream>
 #include <iomanip>
 #include <format>
+#include <tuple>
 #include <unordered_map>
 #include "util.h"
 #include "logger.h"
@@ -50,6 +51,8 @@ namespace sql
 	void exec_sql(const std::string& dbname, const std::string& sql);
 	bool has_rows(const std::string& dbname, const std::string &sql);
 	record get_record(const std::string& dbname, const std::string& sql);
+	std::vector<recordset> get_rs(const std::string& dbname, const std::string &sql);
+	std::string rs_to_json(const recordset& rs, const std::vector<std::string>& numeric_fields = {});	
 }
 
 #endif /* SQLODBC_H_ */

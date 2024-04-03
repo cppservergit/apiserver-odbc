@@ -15,6 +15,7 @@
 #include <charconv>
 #include <format>
 #include "logger.h"
+#include "pkeyutil.h"
 
 namespace env 
 {
@@ -23,6 +24,7 @@ namespace env
 	unsigned short int pool_size() noexcept;
 	unsigned short int login_log_enabled() noexcept;
 	unsigned short int jwt_expiration() noexcept;
+	unsigned short int enable_audit() noexcept;
 	std::string get_str(const std::string& name) noexcept;
 }
 
