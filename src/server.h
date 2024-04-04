@@ -283,8 +283,9 @@ struct server
 		if (api.is_secure) {
 			req.check_security(api.roles);
 			if (enable_audit) {
+				std::string payload {req.isMultipart ? "multipart-form-data" : req.get_body()};
 				audit_trail at{req.user_info.login, req.remote_ip, req.path, 
-							std::string(req.get_body()), req.user_info.sessionid, req.get_header("user-agent"), pod_name};
+							payload, req.user_info.sessionid, req.get_header("user-agent"), pod_name};
 				save_audit_trail(at);
 			}
 		}
