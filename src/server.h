@@ -82,8 +82,9 @@ struct webapi_path
 constexpr void audit_task(auto& params) noexcept
 {
 		constexpr auto tpl {"sp_audit_trail '{}', '{}', '{}','{}', '{}', '{}', '{}'"};
-		const auto sql {std::format(tpl, 	params.path, params.username, params.remote_ip, 
-											params.payload, params.sessionid, params.useragent, params.nodename)};
+		const auto sql {std::format(tpl, params.path, params.username, params.remote_ip, 
+										util::encode_sql(params.payload), params.sessionid, 
+										params.useragent, params.nodename)};
 		try {
 			sql::exec_sql("CPP_AUDITDB", sql);
 		} catch (const sql::database_exception& e) {

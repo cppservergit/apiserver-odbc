@@ -24,8 +24,8 @@ namespace util
 
 	//return date as yyyy-mm-dd
 	std::string today() noexcept;
-	
-	std::string encode_json(const std::string& s);
+	std::string encode_json(const std::string& s) noexcept;
+	std::string encode_sql(std::string_view s) noexcept;
 }
 
 #endif /* UTILS_H_ */

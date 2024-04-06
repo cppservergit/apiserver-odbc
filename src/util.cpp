@@ -7,7 +7,7 @@ namespace util
 		return std::format("{:%F}", std::chrono::system_clock::now());
 	}
 	
-	std::string encode_json(const std::string& s)
+	std::string encode_json(const std::string& s) noexcept
 	{
 		std::ostringstream out;
 		for (char c : s) {
@@ -29,4 +29,18 @@ namespace util
 		}
 		return out.str();
 	}
+	
+	std::string encode_sql(std::string_view s) noexcept
+	{
+		std::ostringstream out;
+		for (char c : s) {
+			switch (c) {
+				case '\\': out << R"(\\)"; break;
+				case '\'': out << R"('')"; break;
+				default:
+					out << c;
+			}
+		}
+		return out.str();
+	}	
 }
