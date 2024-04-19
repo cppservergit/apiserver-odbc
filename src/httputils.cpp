@@ -143,6 +143,8 @@ namespace
 	{
 		std::vector<http::form_field> fields;
 		for (const auto& vec {parse_body(req)}; auto& part: vec) {
+			if (part.size() == 0)
+				throw std::runtime_error("Invalid multipart-form payload, part is empty!");
 			auto elems {parse_part(part)};
 			fields.push_back(get_form_field(elems));
 		}
@@ -570,9 +572,13 @@ namespace http
 	bool request::eof() 
 	{
 		if ( (payload.size() - internals.bodyStartPos) == internals.contentLength ) {
-			if (method == "POST" && isMultipart) 
-				parse_form();
-			else if (method == "POST" && get_header("content-type").ends_with("/json")) {
+			if (method == "POST" && isMultipart) {
+				try {
+					parse_form();
+				} catch (std::runtime_error& e) {
+					set_parse_error(e.what());
+				}
+			} else if (method == "POST" && get_header("content-type").ends_with("/json")) {
 				try {
 					parse_json(this);
 				} catch (json::invalid_json_exception& e) {
