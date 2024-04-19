@@ -42,6 +42,19 @@ namespace http
 
 	enum class verb {GET, POST};
 
+	class invalid_payload_exception
+	{ 
+		public:
+			std::string what() const noexcept
+			{
+				return error_description;
+			}
+			explicit invalid_payload_exception(const std::string& _errmsg): 
+				error_description{_errmsg} { }
+		private:
+			std::string error_description;
+	};
+
 	class invalid_input_exception
 	{
 		public:
