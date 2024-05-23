@@ -49,9 +49,9 @@ It uses direct calls to the ODBC C API for maximum speed, `libcurl` for secure e
 
 ## Requirements
 
-The test environment is Ubuntu 23.10 with GCC 13.2, We used Canonical's Multipass VMs on Windows 10 Pro, it's a very agile tool for managing lightweight VMs on Windows, you can create an Ubuntu 23.10 VM using a command like this, with very few resources:
+The test environment is Ubuntu 24.04 with GCC 13.2, We used Canonical's Multipass VMs on Windows 10 Pro, it's a very agile tool for managing lightweight VMs on Windows, you can create an Ubuntu VM using a command like this, with very few resources:
 ```
-multipass launch -n testvm -c 4 -m 2g -d 6g mantic
+multipass launch -n testvm -c 4 -m 2g -d 6g lts
 ```
 If you are not going to update the whole operating system then you can use `-d 4g` for 4GB of disk space.
 
@@ -62,7 +62,7 @@ sudo apt update
 
 Install required packages:
 ```
-sudo apt install g++-13 libssl-dev libcurl4-openssl-dev uuid-dev libjson-c-dev unixodbc-dev tdsodbc make -y --no-install-recommends
+sudo apt install g++ libssl-dev libcurl4-openssl-dev uuid-dev libjson-c-dev unixodbc-dev tdsodbc make -y --no-install-recommends
 ```
 
 Optionally, if your VM has enough disk space (10GB) you can upgrade the rest of the operating system, it may take some minutes and require a restart of the VM:
@@ -113,15 +113,15 @@ make
 
 Expected output:
 ```
-g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel -c src/env.cpp
-g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel -c src/logger.cpp
-g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel -c src/jwt.cpp
-g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel -c src/httputils.cpp
-g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel -c src/sql.cpp
-g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel -c src/login.cpp
-g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel -DCPP_BUILD_DATE=20230807 -c src/server.cpp
-g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel -c src/main.cpp
-g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel env.o logger.o jwt.o httputils.o email.o pkeyutil.o odbcutil.o sql.o util.o main.o -lodbc -lcurl -lcrypto -luuid -ljson-c -o "apiserver"
+g++ -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel -c src/env.cpp
+g++ -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel -c src/logger.cpp
+g++ -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel -c src/jwt.cpp
+g++ -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel -c src/httputils.cpp
+g++ -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel -c src/sql.cpp
+g++ -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel -c src/login.cpp
+g++ -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel -DCPP_BUILD_DATE=20230807 -c src/server.cpp
+g++ -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel -c src/main.cpp
+g++ -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel env.o logger.o jwt.o httputils.o email.o pkeyutil.o odbcutil.o sql.o util.o main.o -lodbc -lcurl -lcrypto -luuid -ljson-c -o "apiserver"
 ```
 
 ## Run API-Server++
@@ -320,8 +320,8 @@ make
 
 Expected output:
 ```
-g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=native -mtune=intel -DCPP_BUILD_DATE=20240306 -c src/main.cpp
-g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=native -mtune=intel env.o logger.o jwt.o httputils.o email.o pkeyutil.o odbcutil.o sql.o util.o main.o -lodbc -lcurl -lcrypto -luuid -ljson-c -o "apiserver"
+g++ -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=native -mtune=intel -DCPP_BUILD_DATE=20240306 -c src/main.cpp
+g++ -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=native -mtune=intel env.o logger.o jwt.o httputils.o email.o pkeyutil.o odbcutil.o sql.o util.o main.o -lodbc -lcurl -lcrypto -luuid -ljson-c -o "apiserver"
 ```
 
 Now run the server again:
@@ -656,8 +656,8 @@ make
 
 Expected output:
 ```
-g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel -c src/main.cpp
-g++-13 -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=native -mtune=intel env.o logger.o jwt.o httputils.o email.o pkeyutil.o odbcutil.o sql.o util.o main.o -lodbc -lcurl -lcrypto -luuid -ljson-c -o "apiserver"
+g++ -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel -c src/main.cpp
+g++ -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=native -mtune=intel env.o logger.o jwt.o httputils.o email.o pkeyutil.o odbcutil.o sql.o util.o main.o -lodbc -lcurl -lcrypto -luuid -ljson-c -o "apiserver"
 ```
 
 Run the new version:
@@ -871,7 +871,7 @@ This API will invoke a stored procedure to delete a record, but instead of waiti
 		}
 	);
 ```
-The `req.enforce()` method evaluates the result of the passed lambda function (validator), if false then stops execution of the API and the client will receive a JSON response with status INVALID and the fields passed to this method (first two arguments). In this example, the validator checks if this category ID is being used in another table, the SQL logic for this is encapsulated in `sp_categ_in_use`, which does not return JSON but a regular resultset, the function `sql::has_rows()` returns true if the resultset contains at least 1 row. This example shows how custom validation/pre-condition rules can be applied inside an API, and if any of these custom validators return false then the rest of the code won't be executed, that's the guarantee enforced by API-Server++.
+The `req.enforce()` function evaluates the result of the passed lambda function (validator), if false then stops execution of the API and the client will receive a JSON response with status INVALID and the fields passed to this method (first two arguments). In this example, the validator checks if this category ID is being used in another table, the SQL logic for this is encapsulated in `sp_categ_in_use`, which does not return JSON but a regular resultset, the function `sql::has_rows()` returns true if the resultset contains at least 1 row. This example shows how custom validation/pre-condition rules can be applied inside an API, and if any of these custom validators return false then the rest of the code won't be executed, that's the guarantee enforced by API-Server++.
 
 The backend SP behind the validator is very simple and optimized for a quick response:
 ```
