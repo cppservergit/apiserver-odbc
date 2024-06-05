@@ -8,11 +8,11 @@ export CPP_POOL_SIZE=4
 export CPP_JWT_SECRET="B@s!ca123*"
 export CPP_JWT_EXP=600
 # ODBC SQL authenticator config
-export CPP_LOGINDB="Driver=FreeTDS;SERVER=demodb.mshome.net;PORT=1433;DATABASE=testdb;UID=sa;PWD=Basica2024;APP=CPPServer;Encryption=off;ClientCharset=UTF-8"
+export CPP_LOGINDB="Driver=FreeTDS;SERVER=demodb.mshome.net;PORT=1433;DATABASE=testdb;UID=sa;PWD=Basica2024;APP=apiserver;Encryption=off;ClientCharset=UTF-8"
 # ODBC audit trail config
-export CPP_AUDITDB="Driver=FreeTDS;SERVER=demodb.mshome.net;PORT=1433;DATABASE=testdb;UID=sa;PWD=Basica2024;APP=CPPServer;Encryption=off;ClientCharset=UTF-8"
+export CPP_AUDITDB="Driver=FreeTDS;SERVER=demodb.mshome.net;PORT=1433;DATABASE=testdb;UID=sa;PWD=Basica2024;APP=apiserver;Encryption=off;ClientCharset=UTF-8"
 # ODBC SQL data sources
-export DB1="Driver=FreeTDS;SERVER=demodb.mshome.net;PORT=1433;DATABASE=demodb;UID=sa;PWD=Basica2024;APP=CPPServer;Encryption=off;ClientCharset=UTF-8"
+export DB1="Driver=FreeTDS;SERVER=demodb.mshome.net;PORT=1433;DATABASE=demodb;UID=sa;PWD=Basica2024;APP=apiserver;Encryption=off;ClientCharset=UTF-8"
 # secure mail config
 export CPP_MAIL_SERVER="smtp://smtp.gmail.com:587"
 export CPP_MAIL_USER="admin@martincordova.com"
