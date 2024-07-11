@@ -153,6 +153,6 @@ namespace jwt
 	std::string get_signature(std::string_view message) 
 	{
 		static jwt_config config;
-		return sign(message, config.secret);
+		return sign(base64_encode(message), config.secret);
 	}
 }

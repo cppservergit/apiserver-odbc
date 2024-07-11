@@ -47,7 +47,7 @@
 #include "jwt.h"
 #include "email.h"
 
-constexpr char SERVER_VERSION[] = "API-Server++ v1.1.0";
+constexpr char SERVER_VERSION[] = "API-Server++ v1.1.4";
 constexpr const char* LOGGER_SRC {"server"};
 
 struct webapi_path
@@ -241,7 +241,7 @@ struct server
 	constexpr void send_error(http::request& req, const int status, std::string_view msg) 
 	{
 		if (status == 400)
-			logger::log(LOGGER_SRC, "error", std::format("HTTP status: {} IP: {} description: Bad request - {}", status, req.remote_ip, req.internals.errmsg));
+			logger::log(LOGGER_SRC, "error", std::format("HTTP status: {} IP: {} description: Bad request - {}", status, req.remote_ip, req.internals.errmsg), req.get_header("x-request-id"));
 		
 		constexpr auto res {
 			"HTTP/1.1 {} {}\r\n"
@@ -325,9 +325,12 @@ struct server
 		} catch (const sql::database_exception& e) { 
 			error_msg = e.what();
 			req.response.set_body(R"({"status":"ERROR","description":"Service error"})");
+		} catch (const json::invalid_json_exception& e) {
+			error_msg = e.what();
+			req.response.set_body(R"({"status":"ERROR","description":"Service error"})");
 		}
 		if (!error_msg.empty())
-			logger::log("service", "error", std::format("{}, {}", req.path, error_msg));
+			logger::log("service", "error", std::format("{}, {}", req.path, error_msg), req.get_header("x-request-id"));
 	}
 
 	constexpr void log_request(const http::request& req, double duration) noexcept

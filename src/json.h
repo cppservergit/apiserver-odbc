@@ -30,12 +30,39 @@ namespace json
             std::string m_msg;
 	};		
 
+	inline struct json_object* json_tokener_parse_verbose2(std::string_view str, enum json_tokener_error *error)
+	{
+		struct json_tokener *tok;
+		struct json_object *obj;
+
+		tok = json_tokener_new();
+		if (!tok)
+		{
+			*error = json_tokener_error_memory;
+			return nullptr;
+		}
+		json_tokener_set_flags(tok, JSON_TOKENER_STRICT | JSON_TOKENER_ALLOW_TRAILING_CHARS);
+		obj = json_tokener_parse_ex(tok, str.data(), str.size());
+		*error = tok->err;
+		if (tok->err != json_tokener_success)
+		{
+			if (obj != NULL)
+				json_object_put(obj);
+			obj = NULL;
+		}
+
+		json_tokener_free(tok);
+		return obj;
+	}
+
 	inline auto parse(std::string_view json)
 	{
+		enum json_tokener_error jerr;
 		std::unordered_map<std::string, std::string, util::string_hash, std::equal_to<>> fields;
-		json_object * jobj = json_tokener_parse(json.data());
+		json_object * jobj = json_tokener_parse_verbose2(json.data(), &jerr);
 		if (jobj == nullptr) {
-			std::clog << std::format("[DEBUG][JSON] invalid JSON format: {}\n", json);
+			std::string json_error {json_tokener_error_desc(jerr)};
+			std::clog << std::format("[DEBUG][JSON] invalid JSON format: {} payload: {}\n", json_error, json);
 			throw invalid_json_exception("invalid JSON format, check stderr log for details");
 		}
 		json_object_object_foreach(jobj, key, val) {
