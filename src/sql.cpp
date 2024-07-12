@@ -268,7 +268,7 @@ namespace
 		}
 	}
 
-	inline void retry(RETCODE rc, const std::string& dbname, dbutil& db, int& retries, const std::string& sql)
+	inline void retry(RETCODE rc, const std::string& dbname, const dbutil& db, int& retries, const std::string& sql)
 	{
 		auto [error_code, sqlstate, error_msg] {get_error_info(db.henv, db.hdbc, db.hstmt)};
 		if (sqlstate == "01000" || sqlstate == "08S01" || rc == SQL_INVALID_HANDLE) {
@@ -426,7 +426,7 @@ namespace sql
 			json.append("{");
 			for (const auto&[key, value]: rec) {
 				if (contains(key))
-					json.append(std::format(R"("{}":{},)", key, value.empty() ? value : "null"));
+					json.append(std::format(R"("{}":{},)", key, !value.empty() ? value : "null"));
 				else
 					json.append(std::format(R"("{}":"{}",)", key, util::encode_json(value)));
 			}

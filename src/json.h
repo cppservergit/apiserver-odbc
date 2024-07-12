@@ -46,9 +46,9 @@ namespace json
 		*error = tok->err;
 		if (tok->err != json_tokener_success)
 		{
-			if (obj != NULL)
+			if (obj != nullptr)
 				json_object_put(obj);
-			obj = NULL;
+			obj = nullptr;
 		}
 
 		json_tokener_free(tok);

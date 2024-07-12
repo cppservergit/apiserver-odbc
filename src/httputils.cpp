@@ -94,8 +94,7 @@ namespace
 
 	constexpr std::vector<std::string_view> parse_part(std::string_view body) {
 		std::vector<std::string_view> vec;
-		constexpr std::string_view delim{"\r\n"};
-		for (const auto& word : std::views::split(body, delim)) {
+		for (constexpr std::string_view delim{"\r\n"}; const auto& word : std::views::split(body, delim)) {
 			auto part {std::string_view{word}};
 			if (part.empty()) continue;
 			vec.push_back(part);
@@ -718,7 +717,7 @@ namespace http
 	{
 		auto mail_body {get_mail_body(this, body)};
 		auto x_request_id {get_header("x-request-id")};
-		std::jthread task ([=]() {
+		std::jthread task ([to, cc, subject, mail_body, attachment, attachment_filename, x_request_id]() {
 			smtp::mail m(env::get_str("CPP_MAIL_SERVER"), env::get_str("CPP_MAIL_USER"), env::get_str("CPP_MAIL_PWD"));
 			m.set_x_request_id(x_request_id);
 			m.set_to(to);
