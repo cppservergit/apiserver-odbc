@@ -99,7 +99,7 @@ cp *.bak sql/data
 
 ### demodb
 ```
-sudo docker exec -it mssql /opt/mssql-tools/bin/sqlcmd -S localhost \
+sudo docker exec -it mssql /opt/mssql-tools18/bin/sqlcmd -No -S localhost \
    -U SA -P 'Basica2024' \
    -Q 'RESTORE DATABASE demodb FROM DISK="/var/opt/mssql/data/demodb.bak" WITH REPLACE, RECOVERY;'
 ```
@@ -107,7 +107,7 @@ sudo docker exec -it mssql /opt/mssql-tools/bin/sqlcmd -S localhost \
 ### testdb
 This is the security database that serves as an example of integration with a custom SQL-based security mechanism (users, roles, etc), of particular importance is the stored procedure `cpp_dblogin`, regardless of the security database structure, API-Server++ login module expects an SP with this name, parameters, and other conventions; the SP is fully documented inside.
 ```
-sudo docker exec -it mssql /opt/mssql-tools/bin/sqlcmd -S localhost \
+sudo docker exec -it mssql /opt/mssql-tools18/bin/sqlcmd -No -S localhost \
    -U SA -P 'Basica2024' \
    -Q 'RESTORE DATABASE testdb FROM DISK="/var/opt/mssql/data/testdb.bak" WITH REPLACE, RECOVERY;'
 ```
