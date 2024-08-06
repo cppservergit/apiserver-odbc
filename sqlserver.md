@@ -145,7 +145,7 @@ It is also desirable to shrink your database before executing the backup using t
 ### Using the SQL command line console inside the docker container
 It might be the case that your docker container is not visible to remote GUI clients, this could be the case if you installed it in a multipass VM and then you want to connect from a remote machine, the VM won't be visible by default when using Multipass unless you configured a bridge for that purpose. In this case, you can enter a terminal session inside your docker container, right from the VM where docker is installed of course:
 ```
-sudo docker exec -it mssql /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P 'Basica2024'
+sudo docker exec -it mssql /opt/mssql-tools18/bin/sqlcmd -No -S localhost -U SA -P 'Basica2024'
 ```
 After executing this command, you are inside sqlcmd running in your docker container  `mssql`, now you can execute SQL commands like this:
 ```
