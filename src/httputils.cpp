@@ -712,12 +712,13 @@ namespace http
 		send_mail(to, cc, subject, body, "", "");
 	}
 
+	std::jthread _task;
 	void request::send_mail(const std::string& to, const std::string& cc, const std::string& subject, const std::string& body, 
 		const std::string& attachment, const std::string& attachment_filename)
 	{
 		auto mail_body {get_mail_body(this, body)};
 		auto x_request_id {get_header("x-request-id")};
-		std::jthread task ([to, cc, subject, mail_body, attachment, attachment_filename, x_request_id]() {
+		auto task = [to, cc, subject, mail_body, attachment, attachment_filename, x_request_id]() {
 			smtp::mail m(env::get_str("CPP_MAIL_SERVER"), env::get_str("CPP_MAIL_USER"), env::get_str("CPP_MAIL_PWD"));
 			m.set_x_request_id(x_request_id);
 			m.set_to(to);
@@ -732,8 +733,9 @@ namespace http
 					m.add_attachment(filepath);
 			}
 			m.send();
-		});
-		task.detach();
+		};
+		_task = std::move(std::jthread{task});
+		
 	}
 
 	std::string_view request::get_body() const noexcept
