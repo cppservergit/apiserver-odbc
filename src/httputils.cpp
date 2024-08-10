@@ -2,7 +2,7 @@
 
 namespace
 {
-	std::jthread _task;
+	thread_local std::jthread _task;
 	
 	/* utility functions */
 	template<typename T>
@@ -717,8 +717,8 @@ namespace http
 	void request::send_mail(const std::string& to, const std::string& cc, const std::string& subject, const std::string& body, 
 		const std::string& attachment, const std::string& attachment_filename)
 	{
-		auto mail_body {get_mail_body(this, body)};
-		auto x_request_id {get_header("x-request-id")};
+		const auto mail_body {get_mail_body(this, body)};
+		const auto x_request_id {get_header("x-request-id")};
 		const auto task = [to, cc, subject, mail_body, attachment, attachment_filename, x_request_id]() {
 			smtp::mail m(env::get_str("CPP_MAIL_SERVER"), env::get_str("CPP_MAIL_USER"), env::get_str("CPP_MAIL_PWD"));
 			m.set_x_request_id(x_request_id);
