@@ -42,5 +42,5 @@ namespace util
 			}
 		}
 		return out.str();
-	}	
+	}
 }

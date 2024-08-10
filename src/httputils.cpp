@@ -2,8 +2,6 @@
 
 namespace
 {
-	thread_local std::jthread _task;
-	
 	/* utility functions */
 	template<typename T>
 	requires(std::is_arithmetic_v<T>)
@@ -719,7 +717,7 @@ namespace http
 	{
 		const auto mail_body {get_mail_body(this, body)};
 		const auto x_request_id {get_header("x-request-id")};
-		const auto task = [to, cc, subject, mail_body, attachment, attachment_filename, x_request_id]() {
+		auto task = [to, cc, subject, mail_body, attachment, attachment_filename, x_request_id]() {
 			smtp::mail m(env::get_str("CPP_MAIL_SERVER"), env::get_str("CPP_MAIL_USER"), env::get_str("CPP_MAIL_PWD"));
 			m.set_x_request_id(x_request_id);
 			m.set_to(to);
@@ -735,7 +733,7 @@ namespace http
 			}
 			m.send();
 		};
-		_task = std::jthread{task};
+		thread::launch_async(task);
 	}
 
 	std::string_view request::get_body() const noexcept

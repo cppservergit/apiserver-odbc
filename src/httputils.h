@@ -29,6 +29,7 @@
 #include <sys/socket.h>
 #include <uuid/uuid.h>
 #include "util.h"
+#include "threadutil.h"
 #include "logger.h"
 #include "jwt.h"
 #include "email.h"
