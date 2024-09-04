@@ -1,14 +1,14 @@
-# QuickStart SQL Server with docker on Ubuntu 22.04
+# QuickStart SQL Server with docker on Ubuntu 24.04
 
-Let's assume that you have a brand-new Ubuntu 22.04 virtual machine, if it was created with multipass you will use the `ubuntu` user and its `/home/ubuntu` directory.
-Please login to this VM and make sure you are in your home directory.
+Let's assume that you have a brand-new Ubuntu 24.04 virtual machine, if it was created with multipass you will use the `ubuntu` user and its `/home/ubuntu` directory.
+Please log in to this VM and make sure you are in your home directory.
 
 When using multipass you can create the VM with this command:
 ```
 multipass launch -n sqlserver -c 4 -m 4G -d 12G
 multipass shell sqlserver
 ```
-These parameters are enough to run a few small demo databases. Add more disk space if necessary.
+These parameters are enough to run a few small demo databases.
 
 __Just in case__: [Install Multipass on your system](https://multipass.run/install)
 
@@ -124,7 +124,6 @@ Driver=FreeTDS;SERVER=172.22.103.242;PORT=1433;DATABASE=demodb;UID=sa;PWD=Basica
 ```
 By default API-Server++ uses FreeTDS ODBC Driver, it works for SQL Server and Sybase.
 
-Suppose you want to use the latest Microsoft ODBC Driver for Linux, the native SQL Server client API, in that case, you need Ubuntu 23.04 to use it with API-Server++ because it is currently unavailable on more recent Ubuntu versions like Mantis or Noble. As soon as it becomes available on Ubuntu Noble 24.04, this would be the recommended server platform for API-Server++.
 The connection string for the Microsoft Driver is this:
 ```
 Driver=ODBC Driver 18 for SQL Server;SERVER=172.22.103.242;PORT=1433;Database=demodb;Uid=sa;Pwd=Basica2024;APP=API-Server;Encrypt=no;
@@ -134,6 +133,8 @@ We suggest using Microsoft's driver when possible, it's a direct native client. 
 * [Free TDS ODBC connection properties](https://www.freetds.org/userguide/freetdsconf.html) Look for table 3.3 at the end of the document.
 
 You may have noticed that we include the `APP` attribute on the connection string, this is useful to monitor API-Server++ connections on the server.
+
+To install Microsoft's SQL Server ODBC Driver latest version on Ubuntu 24.04 please follow [this guide](https://learn.microsoft.com/en-us/sql/connect/odbc/linux-mac/installing-the-microsoft-odbc-driver-for-sql-server?view=sql-server-ver16&tabs=ubuntu18-install%2Calpine17-install%2Cdebian8-install%2Credhat7-13-install%2Crhel7-offline)
 
 ### Executing clean backups in SQL Server 2019
 It's necessary to perform a backup with the overwrite option, otherwise, when you restore you may see old data, and your backup file keeps growing, you can specify this option when using Microsoft's GUI tool Management Studio, but you can also do it via SQL or command line with `sqlcmd` using:
