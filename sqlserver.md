@@ -134,7 +134,23 @@ We suggest using Microsoft's driver when possible, it's a direct native client. 
 
 You may have noticed that we include the `APP` attribute on the connection string, this is useful to monitor API-Server++ connections on the server.
 
-To install Microsoft's SQL Server ODBC Driver latest version on Ubuntu 24.04 please follow [this guide](https://learn.microsoft.com/en-us/sql/connect/odbc/linux-mac/installing-the-microsoft-odbc-driver-for-sql-server?view=sql-server-ver16&tabs=ubuntu18-install%2Calpine17-install%2Cdebian8-install%2Credhat7-13-install%2Crhel7-offline)
+#### Install Microsoft ODBC Driver 18 on Ubuntu 24.04
+
+Trust Microsoft repo
+```
+curl https://packages.microsoft.com/keys/microsoft.asc | sudo gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg
+```
+
+Add repo to APT sources
+```
+curl https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/prod.list | sudo tee /etc/apt/sources.list.d/mssql-release.list
+```
+
+Install the ODBC driver
+```
+sudo apt-get update
+sudo ACCEPT_EULA=Y apt-get install -y msodbcsql18
+```
 
 ### Executing clean backups in SQL Server 2019
 It's necessary to perform a backup with the overwrite option, otherwise, when you restore you may see old data, and your backup file keeps growing, you can specify this option when using Microsoft's GUI tool Management Studio, but you can also do it via SQL or command line with `sqlcmd` using:
