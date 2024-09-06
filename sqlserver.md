@@ -123,7 +123,7 @@ Take note of your VM IP address with `ip a` looking for the 2nd or 3rd interface
 Driver=FreeTDS;SERVER=172.22.103.242;PORT=1433;DATABASE=testdb;UID=sa;PWD=Basica2024;APP=API-Server;Encryption=off;ClientCharset=UTF-8
 Driver=FreeTDS;SERVER=172.22.103.242;PORT=1433;DATABASE=demodb;UID=sa;PWD=Basica2024;APP=API-Server;Encryption=off;ClientCharset=UTF-8
 ```
-If you have a DNS name for the database server then it would be better to use that name instead of the IP address, if you are using a Multipass VM on a Windows host it is way better to use the network name xxx.mshome.net in your ODBC connection string. APIServer++ supports encrypted connection strings using OpenSSL's RSA asymmetric encryption
+If you have a DNS name for the database server then it would be better to use that name instead of the IP address, if you are using a Multipass VM on a Windows host it is way better to use the network name xxx.mshome.net in your ODBC connection string. APIServer++ supports encrypted connection strings using OpenSSL's RSA asymmetric encryption for environment variables.
 
 Using encryption is possible with this ODBC driver, we disable it by default for development, troubleshooting encryption configuration between the client and the SQL Server is beyond the scope of this guide, please refer to the driver's documentation.
 * [Free TDS ODBC connection properties](https://www.freetds.org/userguide/freetdsconf.html) Look for table 3.3 at the end of the document.
