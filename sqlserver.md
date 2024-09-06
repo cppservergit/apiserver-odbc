@@ -117,40 +117,18 @@ That's it, your SQL Server should be ready to accept connections.
 ## Notes
 
 ### ODBC connection strings
+API-Server++ uses FreeTDS ODBC Driver, a fast and solid driver that works with SQL Server and Sybase.
 Take note of your VM IP address with `ip a` looking for the 2nd or 3rd interface, depending on the network configuration of your host:
 ```
 Driver=FreeTDS;SERVER=172.22.103.242;PORT=1433;DATABASE=testdb;UID=sa;PWD=Basica2024;APP=API-Server;Encryption=off;ClientCharset=UTF-8
 Driver=FreeTDS;SERVER=172.22.103.242;PORT=1433;DATABASE=demodb;UID=sa;PWD=Basica2024;APP=API-Server;Encryption=off;ClientCharset=UTF-8
 ```
-By default API-Server++ uses FreeTDS ODBC Driver, it works for SQL Server and Sybase.
+If you have a DNS name for the database server then it would be better to use that name instead of the IP address, if you are using a Multipass VM on a Windows host it is way better to use the network name xxx.mshome.net in your ODBC connection string. APIServer++ supports encrypted connection strings using OpenSSL's RSA asymmetric encryption
 
-The connection string for the Microsoft Driver is this:
-```
-Driver=ODBC Driver 18 for SQL Server;SERVER=172.22.103.242;PORT=1433;Database=demodb;Uid=sa;Pwd=Basica2024;APP=API-Server;Encrypt=no;
-```
-We suggest using Microsoft's driver when possible, it's a direct native client. Using encryption is possible with both drivers, we disable it by default for development, troubleshooting encryption configuration between the client and the SQL Server is beyond the scope of this guide, but here are some useful references from the official drivers' documentation.
-* [Troubleshooting encryption with the Microsoft driver](https://learn.microsoft.com/en-us/sql/connect/odbc/connection-troubleshooting?view=sql-server-ver16)
+Using encryption is possible with this ODBC driver, we disable it by default for development, troubleshooting encryption configuration between the client and the SQL Server is beyond the scope of this guide, please refer to the driver's documentation.
 * [Free TDS ODBC connection properties](https://www.freetds.org/userguide/freetdsconf.html) Look for table 3.3 at the end of the document.
 
 You may have noticed that we include the `APP` attribute on the connection string, this is useful to monitor API-Server++ connections on the server.
-
-#### Install Microsoft ODBC Driver 18 on Ubuntu 24.04
-
-Trust Microsoft repo
-```
-curl https://packages.microsoft.com/keys/microsoft.asc | sudo gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg
-```
-
-Add repo to APT sources
-```
-curl https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/prod.list | sudo tee /etc/apt/sources.list.d/mssql-release.list
-```
-
-Install the ODBC driver
-```
-sudo apt-get update
-sudo ACCEPT_EULA=Y apt-get install -y msodbcsql18
-```
 
 ### Executing clean backups in SQL Server 2019
 It's necessary to perform a backup with the overwrite option, otherwise, when you restore you may see old data, and your backup file keeps growing, you can specify this option when using Microsoft's GUI tool Management Studio, but you can also do it via SQL or command line with `sqlcmd` using:
