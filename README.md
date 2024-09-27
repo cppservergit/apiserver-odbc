@@ -72,14 +72,11 @@ sudo apt upgrade -y
 
 __Notes__: 
 
-* You can run API-Server++ on Ubuntu 22.04 if you create a native Linux LXD container with Ubuntu 23.10 to run the API-Server++ binary and use HAProxy as the HTTPS front on Ubuntu 22.04 (the server host OS), this way you can run on a reliable LTS Ubuntu server, and also protect network access to API-Server++, which is only visible from the host via HAProxy.
+* A cluster of API-Server++ nodes can run on a single Ubuntu 24.04 VM using native Linux LXD containers and HAProxy as the HTTPS load balancer. This way, you can run on a reliable LTS Ubuntu server and also protect network access to API-Server++, which is only visible from the host via HAProxy. API-Server++ can also run on docker, Kubernetes (Micro K8s recommended and supported), or a cloud serverless service like Azure Container Apps.
 
-![image](https://github.com/cppservergit/apiserver-odbc/assets/126841556/b168d1f7-28b3-40f2-8bfb-78eb68045916)
+![image](https://github.com/user-attachments/assets/dca635ea-e791-42e5-b02b-07672f60a33e)
 
-* Starting on April 2024 Ubuntu 24.04 LTS can be used for production on the host and the container.
-* At present the Microsoft ODBC Driver can be used on Ubuntu 23.04, this would be a constraint for the LXD container if you want to use this driver, otherwise you can use FreeTDS ODBC driver (for Sybase too) with more recent versions of Ubuntu Server.
-
-API-Server++ requires GCC 13.1 or newer because it does take advantage of the latest C++ 20/23 standard features that are only supported by GCC 13.1 onwards, like `<format>`, `constexpr` strings and functions, ranges, and more. This way API-Server++ achieves an "A" qualification with SonarQube static analyzer, being fully compliant with [C++ Core Guidelines](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines).
+API-Server++ requires GCC 13.2 (default on Ubuntu 24.04) or newer because it does take advantage of the latest C++ 20/23 standard features that are only supported by GCC 13 onwards, like `<format>`, `constexpr` strings and functions, ranges, and more. This way API-Server++ achieves an "A" qualification with SonarQube static analyzer, being fully compliant with [C++ Core Guidelines](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines).
 
 ### Demo database setup
 
