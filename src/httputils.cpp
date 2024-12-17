@@ -235,15 +235,20 @@ namespace http
 			"Content-Length: {}\r\n"
 			"Content-Type: {}\r\n"
 			"Date: {:%a, %d %b %Y %H:%M:%S GMT}\r\n"
-			"Keep-Alive: timeout=60, max=25\r\n"
 			"Access-Control-Allow-Origin: {}\r\n"
 			"Access-Control-Expose-Headers: content-disposition\r\n"
 			"Strict-Transport-Security: max-age=31536000; includeSubDomains; preload;\r\n"
 			"X-Frame-Options: SAMEORIGIN\r\n"
 			"Content-Disposition: {}\r\n"
+			"Connection: Close\r\n"
 			"\r\n"
 			"{}" 
 		};
+							
+		if (_origin.empty()) {
+			logger::log("http-response", "error", "set_body() - origin is empty, setting its value to *");
+			_origin = "*";
+		}
 							
 		_buffer.append(std::format(resp, 
 			body.size(),

@@ -47,7 +47,7 @@
 #include "jwt.h"
 #include "email.h"
 
-constexpr char SERVER_VERSION[] = "API-Server++ v1.1.5";
+constexpr char SERVER_VERSION[] = "API-Server++ v1.1.7";
 constexpr const char* LOGGER_SRC {"server"};
 
 struct webapi_path
@@ -146,6 +146,7 @@ constexpr auto consumer = [](std::stop_token tok, auto srv) noexcept
 		event.events = EPOLLOUT | EPOLLET | EPOLLRDHUP;
 		event.data.ptr = &params.req;
 		epoll_ctl(params.req.epoll_fd, EPOLL_CTL_MOD, params.req.fd, &event);
+		
 	}
 	
 	//ending task - free resources
@@ -228,12 +229,20 @@ struct server
 			"Access-Control-Allow-Methods: GET, POST\r\n"
 			"Access-Control-Allow-Headers: {}\r\n"
 			"Access-Control-Max-Age: 600\r\n"
-			"Vary: Origin\r\n"
+			"Vary: origin\r\n"
+			"Connection: Close\r\n"
 			"\r\n"
 		};
+		
+		std::string _origin {req.get_header("origin")};
+		if (_origin.empty()) {
+			logger::log("server", "error", "send_options() - origin is empty, setting its value to *");
+			_origin = "*";
+		}
+		
 		req.response << std::format(res, 
 			std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now()),
-			req.get_header("origin"),
+			_origin,
 			req.get_header("access-control-request-headers")
 		);
 	}
@@ -246,13 +255,13 @@ struct server
 		constexpr auto res {
 			"HTTP/1.1 {} {}\r\n"
 			"Content-Length: {}\r\n"
-			"Content-Type: text/plain\r\n" 
-			"Keep-Alive: timeout=5, max=200\r\n"
+			"Content-Type: text/plain\r\n"
 			"Date: {:%a, %d %b %Y %H:%M:%S GMT}\r\n"
 			"Access-Control-Allow-Origin: {}\r\n"
 			"Access-Control-Allow-Credentials: true\r\n"
 			"Strict-Transport-Security: max-age=31536000; includeSubDomains; preload;\r\n"
 			"X-Frame-Options: SAMEORIGIN\r\n"
+			"Connection: Close\r\n"
 			"\r\n"
 			"{}"
 		};
@@ -370,7 +379,7 @@ struct server
 		req.payload.update_pos(bytes);
 		if (first_packet) {
 			req.parse();
-			if (req.method == "GET" || req.internals.errcode ==  -1)
+			if (req.method == "GET" || req.method == "OPTIONS" || req.internals.errcode ==  -1)
 				return true;
 		}
 		if (req.eof())
@@ -421,16 +430,28 @@ struct server
 		epoll_ctl(epoll_fd, EPOLL_CTL_ADD, fd, &event);
 	}
 
+	constexpr void epoll_handle_error(epoll_event& ev) noexcept
+	{
+		if (ev.data.ptr == nullptr) 
+			logger::log("epoll", "error", "EPOLLERR epoll data ptr is null - unable to retrieve request object");
+		else {
+			http::request& req = *static_cast<http::request*>(ev.data.ptr);
+			logger::log("epoll", "debug", std::format("error on connection for FD: {} - closing it", req.fd));
+			if (int rc {close(req.fd)}; rc == -1)
+				logger::log("epoll", "error", std::format("close FAILED for FD: {} description: {}", req.fd, strerror(errno)));
+		}
+	}
+
 	constexpr void epoll_handle_close(epoll_event& ev) noexcept
 	{
 		if (ev.data.ptr == nullptr) 
 			logger::log("epoll", "error", "EPOLLRDHUP epoll data ptr is null - unable to retrieve request object");
 		else {
 			http::request& req = *static_cast<http::request*>(ev.data.ptr);
+			if (ev.events & EPOLLHUP) 	
+				logger::log("epoll", "debug", std::format("EPOLLHUP connection reset by peer for FD {}", req.fd));
 			if (int rc {close(req.fd)}; rc == -1)
 				logger::log("epoll", "error", std::format("close FAILED for FD: {} description: {}", req.fd, strerror(errno)));
-			if (!req.payload.empty()) //for the case when the request failed to be processed
-				req.clear();
 		}
 		--g_connections;
 	}
@@ -542,9 +563,14 @@ struct server
 			int n_events = epoll_wait(epoll_fd, events.data(), MAXEVENTS, -1);
 			for (int i = 0; i < n_events; i++)
 			{
-				if (events[i].events & EPOLLRDHUP || events[i].events & EPOLLHUP || events[i].events & EPOLLERR)
+				if (events[i].events & EPOLLRDHUP || events[i].events & EPOLLHUP)
 				{
 					epoll_handle_close(events[i]);
+					continue;
+				}
+				else if (events[i].events & EPOLLERR)
+				{
+					epoll_handle_error(events[i]);
 					continue;
 				}
 				else if (m_signal == events[i].data.fd) //shutdown
