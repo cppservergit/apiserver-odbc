@@ -444,7 +444,7 @@ namespace http
 	{
 		constexpr auto msg {"Bad request -> invalid content length header: {} value: {}"};
 		try {
-			internals.contentLength = std::stoul(value.data());
+			internals.contentLength = std::stoul(std::string(value.data()));
 		} catch (const std::invalid_argument& e) {
 			set_parse_error(std::format(msg, e.what(), value));
 			return false;			

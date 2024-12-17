@@ -145,8 +145,8 @@ namespace
 	sql::recordset get_recordset(SQLHSTMT hstmt) 
 	{
 		sql::recordset rs;
-		SQLSMALLINT numCols ;
-		SQLNumResultCols( hstmt, &numCols );
+		SQLSMALLINT numCols{0};
+		SQLNumResultCols(hstmt, &numCols);
 		
 		auto _loop = [&numCols, &rs](auto& cols) {
 			sql::record rec;
@@ -263,7 +263,7 @@ namespace
 		if (auto [result, db]{dbc.get(name, reset)}; result) {
 			return *db;
 		} else {
-			auto connstr {env::get_str(name.data())};
+			auto connstr {env::get_str(std::string(name.data()))};
 			return dbc.add(name, connstr);
 		}
 	}
