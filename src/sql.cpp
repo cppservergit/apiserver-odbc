@@ -263,7 +263,8 @@ namespace
 		if (auto [result, db]{dbc.get(name, reset)}; result) {
 			return *db;
 		} else {
-			auto connstr {env::get_str(std::string(name.data()))};
+			const std::string v {name};
+			auto connstr {env::get_str(v)};
 			return dbc.add(name, connstr);
 		}
 	}

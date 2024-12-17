@@ -347,7 +347,7 @@ namespace http
 	
 	void request::enforce(verb v) const {
 		const std::array<std::string, 2> methods {"GET", "POST"};
-		if (method != methods[int(v)])
+		if (method != methods[std::to_underlying(v)])
 			throw method_not_allowed_exception(method);
 	}
 	
@@ -444,7 +444,8 @@ namespace http
 	{
 		constexpr auto msg {"Bad request -> invalid content length header: {} value: {}"};
 		try {
-			internals.contentLength = std::stoul(std::string(value.data()));
+			const std::string v {value};
+			internals.contentLength = std::stoul(v);
 		} catch (const std::invalid_argument& e) {
 			set_parse_error(std::format(msg, e.what(), value));
 			return false;			
@@ -697,7 +698,7 @@ namespace http
 			if (user_info.roles.empty())
 				throw access_denied_exception(user_info.login, remote_ip, "User has no roles");
 			for (const auto& r: roles)
-				if (user_info.roles.find(r) != std::string::npos) return;
+				if (user_info.roles.contains(r)) return;
 			throw access_denied_exception(user_info.login, remote_ip, "User roles are not authorized to execute this service: " + user_info.roles);
 		}
 	}
