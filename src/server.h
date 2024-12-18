@@ -230,7 +230,7 @@ struct server
 			"Access-Control-Allow-Headers: {}\r\n"
 			"Access-Control-Max-Age: 600\r\n"
 			"Vary: origin\r\n"
-			"Connection: Close\r\n"
+			"Connection: close\r\n"
 			"\r\n"
 		};
 		
@@ -261,7 +261,7 @@ struct server
 			"Access-Control-Allow-Credentials: true\r\n"
 			"Strict-Transport-Security: max-age=31536000; includeSubDomains; preload;\r\n"
 			"X-Frame-Options: SAMEORIGIN\r\n"
-			"Connection: Close\r\n"
+			"Connection: close\r\n"
 			"\r\n"
 			"{}"
 		};
@@ -338,8 +338,9 @@ struct server
 			error_msg = e.what();
 			req.response.set_body(R"({"status":"ERROR","description":"Service error"})");
 		}
-		if (!error_msg.empty())
-			logger::log("service", "error", std::format("{}, {}", req.path, error_msg), req.get_header("x-request-id"));
+		if (!error_msg.empty()) {
+			logger::log("service", "error", std::format("{} {}", req.path, error_msg), req.get_header("x-request-id"));
+		}
 	}
 
 	constexpr void log_request(const http::request& req, double duration) noexcept
@@ -432,11 +433,12 @@ struct server
 
 	constexpr void epoll_handle_error(epoll_event& ev) noexcept
 	{
-		if (ev.data.ptr == nullptr) 
+		--g_connections;
+		if (ev.data.ptr == nullptr)
 			logger::log("epoll", "error", "EPOLLERR epoll data ptr is null - unable to retrieve request object");
 		else {
 			http::request& req = *static_cast<http::request*>(ev.data.ptr);
-			logger::log("epoll", "debug", std::format("error on connection for FD: {} - closing it", req.fd));
+			logger::log("epoll", "error", std::format("error on connection for FD: {} - closing it", req.fd));
 			if (int rc {close(req.fd)}; rc == -1)
 				logger::log("epoll", "error", std::format("close FAILED for FD: {} description: {}", req.fd, strerror(errno)));
 		}
@@ -444,16 +446,14 @@ struct server
 
 	constexpr void epoll_handle_close(epoll_event& ev) noexcept
 	{
+		--g_connections;
 		if (ev.data.ptr == nullptr) 
 			logger::log("epoll", "error", "EPOLLRDHUP epoll data ptr is null - unable to retrieve request object");
 		else {
 			http::request& req = *static_cast<http::request*>(ev.data.ptr);
-			if (ev.events & EPOLLHUP) 	
-				logger::log("epoll", "debug", std::format("EPOLLHUP connection reset by peer for FD {}", req.fd));
 			if (int rc {close(req.fd)}; rc == -1)
 				logger::log("epoll", "error", std::format("close FAILED for FD: {} description: {}", req.fd, strerror(errno)));
 		}
-		--g_connections;
 	}
 
 	constexpr void epoll_handle_connect(int listen_fd, int epoll_fd) noexcept
@@ -470,6 +470,7 @@ struct server
 			epoll_event event;
 			if (buffers.contains(fd)) {
 				http::request& req = buffers[fd];
+				req.clear();
 				req.remote_ip = std::string(remote_ip);
 				req.fd = fd;
 				req.epoll_fd = epoll_fd;
@@ -478,8 +479,10 @@ struct server
 				auto [iter, success] {buffers.try_emplace(fd, epoll_fd, fd, remote_ip)};
 				if (success)
 					event.data.ptr = &iter->second;
-				else
+				else {
 					logger::log("epoll", "error", std::format("error creating a new request object into the hashmap with fd: {}", fd));
+					return;
+				}
 			}
 			event.events = EPOLLIN | EPOLLET | EPOLLRDHUP;
 			epoll_ctl(epoll_fd, EPOLL_CTL_ADD, fd, &event);
@@ -533,7 +536,6 @@ struct server
 	{
 		http::request& req = *static_cast<http::request*>(ev.data.ptr);
 		if (req.response.write(req.fd)) {
-			req.clear();
 			epoll_event event;
 			event.events = EPOLLIN | EPOLLET | EPOLLRDHUP;
 			event.data.ptr = &req;
