@@ -240,7 +240,7 @@ namespace http
 			"Strict-Transport-Security: max-age=31536000; includeSubDomains; preload;\r\n"
 			"X-Frame-Options: SAMEORIGIN\r\n"
 			"Content-Disposition: {}\r\n"
-			"Connection: Close\r\n"
+			"Connection: close\r\n"
 			"\r\n"
 			"{}" 
 		};

@@ -2,7 +2,7 @@
 
 namespace 
 {
-	constexpr int max_retries {3};
+	constexpr int max_retries {10};
 	const std::string LOGGER_SRC {"sql-odbc"};
 	
 	std::pair<std::string, std::string> get_error_msg(SQLHENV henv, SQLHDBC hdbc, SQLHSTMT hstmt) noexcept
@@ -272,7 +272,7 @@ namespace
 	inline void retry(RETCODE rc, const std::string& dbname, const dbutil& db, int& retries, const std::string& sql)
 	{
 		auto [error_code, sqlstate, error_msg] {get_error_info(db.henv, db.hdbc, db.hstmt)};
-		if (sqlstate == "01000" || sqlstate == "08S01" || rc == SQL_INVALID_HANDLE) {
+		if (sqlstate == "HY000" || sqlstate == "01000" || sqlstate == "08S01" || rc == SQL_INVALID_HANDLE) {
 			if (retries == max_retries) {
 				throw sql::database_exception(std::format("retry() -> cannot connect to database:: {}", dbname));
 			} else {
