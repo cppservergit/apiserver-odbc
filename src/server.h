@@ -47,7 +47,7 @@
 #include "jwt.h"
 #include "email.h"
 
-constexpr char SERVER_VERSION[] = "API-Server++ v1.1.9";
+constexpr char SERVER_VERSION[] = "API-Server++ v1.2.1";
 constexpr const char* LOGGER_SRC {"server"};
 
 struct webapi_path
@@ -81,10 +81,10 @@ struct webapi_path
 
 constexpr void audit_task(auto& params) noexcept
 {
-		constexpr auto tpl {"sp_audit_trail '{}', '{}', '{}','{}', '{}', '{}', '{}'"};
+		constexpr auto tpl {"sp_audit_trail '{}', '{}', '{}','{}', '{}', '{}', '{}', '{}'"};
 		const auto sql {std::format(tpl, params.path, params.username, params.remote_ip, 
 										util::encode_sql(params.payload), params.sessionid, 
-										params.useragent, params.nodename)};
+										params.useragent, params.nodename, params.x_request_id)};
 		try {
 			sql::exec_sql("CPP_AUDITDB", sql);
 		} catch (const sql::database_exception& e) {
@@ -195,6 +195,7 @@ struct server
 		std::string sessionid;
 		std::string useragent;
 		std::string nodename;
+		std::string x_request_id;
 	};
 
 	std::queue<worker_params> m_queue;
@@ -287,7 +288,7 @@ struct server
 			if (enable_audit) {
 				std::string payload {req.isMultipart ? "multipart-form-data" : req.get_body()};
 				audit_trail at{req.user_info.login, req.remote_ip, req.path, 
-							payload, req.user_info.sessionid, req.get_header("user-agent"), pod_name};
+							payload, req.user_info.sessionid, req.get_header("user-agent"), pod_name, req.get_header("x-request-id")};
 				save_audit_trail(at);
 			}
 		}
@@ -483,7 +484,7 @@ struct server
 
 	constexpr void epoll_abort_request(http::request& req) noexcept 
 	{
-		logger::log("epoll", "error", std::format("API not found: {}", req.path));
+		logger::log("epoll", "error", std::format("API not found: {} from IP {}", req.path, req.remote_ip), req.get_header("x-request-id"));
 		send_error(req, 404, "Resource not found");
 		epoll_event event;
 		event.events = EPOLLOUT | EPOLLET | EPOLLRDHUP;
@@ -705,10 +706,10 @@ struct server
 					const std::string login_ok {std::format(json, lr.get_display_name(), token)};
 					req.response.set_body(login_ok);
 					if (env::login_log_enabled())
-						logger::log("security", "info", 
-							std::format("login OK - SID: {} user: {} IP: {} token: {} roles: {}", sid, login, req.remote_ip, token, lr.get_roles()));
+						logger::log("security", "info", std::format("login OK - SID: {} user: {} IP: {} token: {} roles: {}", 
+								sid, login, req.remote_ip, token, lr.get_roles()), req.get_header("x-request-id"));
 				} else {
-					logger::log("security", "warn", std::format("login failed - user: {} IP: {}", login, req.remote_ip));
+					logger::log("security", "warn", std::format("login failed - user: {} IP: {}", login, req.remote_ip), req.get_header("x-request-id"));
 					constexpr auto json = R"({{"status":"INVALID","validation":{{"id":"login","code":"{}","description":"{}"}}}})";
 					req.response.set_body(std::format(json, lr.get_error_code(), lr.get_error_description()));
 				}
