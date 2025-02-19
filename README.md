@@ -49,7 +49,7 @@ It uses direct calls to the ODBC C API for maximum speed, `libcurl` for secure e
 
 ## Requirements
 
-The test environment is Ubuntu 24.04 with GCC 13.2, We used Canonical's Multipass VMs on Windows 10 Pro, it's a very agile tool for managing lightweight VMs on Windows, you can create an Ubuntu VM using a command like this, with very few resources:
+The test environment is Ubuntu 24.04 with GCC 13.3, We used Canonical's Multipass VMs on Windows 10 Pro, it's a very agile tool for managing lightweight VMs on Windows, you can create an Ubuntu VM using a command like this, with very few resources:
 ```
 multipass launch -n testvm -c 4 -m 2g -d 6g lts
 ```
