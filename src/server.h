@@ -47,7 +47,7 @@
 #include "jwt.h"
 #include "email.h"
 
-constexpr char SERVER_VERSION[] = "API-Server++ v1.2.1";
+constexpr char SERVER_VERSION[] = "API-Server++ v1.2.2";
 constexpr const char* LOGGER_SRC {"server"};
 
 struct webapi_path
@@ -121,8 +121,6 @@ constexpr auto audit = [](std::stop_token tok, auto srv) noexcept
 
 constexpr auto consumer = [](std::stop_token tok, auto srv) noexcept 
 {
-	logger::log("pool", "info", "starting worker thread");
-	
 	while(!tok.stop_requested())
 	{
 		//prepare lock
@@ -148,9 +146,7 @@ constexpr auto consumer = [](std::stop_token tok, auto srv) noexcept
 		epoll_ctl(params.req.epoll_fd, EPOLL_CTL_MOD, params.req.fd, &event);
 		
 	}
-	
 	//ending task - free resources
-	logger::log("pool", "info", "stopping worker thread");
 };	
 
 struct server
@@ -651,12 +647,15 @@ struct server
 			http::verb::GET, 
 			[this](http::request& req) 
 			{
+				static const auto pool_size {env::pool_size()};
 				const double avg{ ( g_counter > 0 ) ? g_total_time / g_counter : 0 };
 				size_t _counter = g_counter;
 				int _active_threads = g_active_threads;
 				size_t _connections = g_connections;
-				constexpr auto json {R"({{"status": "OK", "data":[{{"pod":"{}","totalRequests":{},"avgTimePerRequest":{:f},"connections":{},"activeThreads":{}}}]}})"};
-				req.response.set_body(std::format(json, pod_name, _counter, avg, _connections, _active_threads));
+				const auto now {std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now())};
+				const auto server_ts {std::format("{:%FT%T}", std::chrono::get_tzdb().current_zone()->to_local(now))};
+				constexpr auto json {R"({{"status": "OK", "data":[{{"pod":"{}","time":"{}","totalRequests":{},"avgTimePerRequest":{:f},"connections":{},"activeThreads":{},"poolSize":{}}}]}})"};
+				req.response.set_body(std::format(json, pod_name, server_ts, _counter, avg, _connections, _active_threads, pool_size));
 			},
 			false /* no security */
 		);
