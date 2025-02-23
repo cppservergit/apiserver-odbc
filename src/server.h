@@ -47,7 +47,7 @@
 #include "jwt.h"
 #include "email.h"
 
-constexpr char SERVER_VERSION[] = "API-Server++ v1.2.2";
+constexpr char SERVER_VERSION[] = "API-Server++ v1.2.3";
 constexpr const char* LOGGER_SRC {"server"};
 
 struct webapi_path
@@ -755,6 +755,28 @@ struct server
 			},
 			false /* no security */
 		);
+		
+		register_webapi
+		(
+			webapi_path("/api/totp"), 
+			"Validate TOTP token given a base32 encoded secret",
+			http::verb::POST, 
+			{ 
+				{"token", http::field_type::STRING, true}, 
+				{"secret", http::field_type::STRING, true}
+			},
+			{ },		
+			[](http::request& req) 
+			{
+				if (auto[result, error_msg]{is_valid_token(req.get_param("token"), req.get_param("secret"))}; result )
+					req.response.set_body(R"({"status":"OK"})");
+				else
+					req.response.set_body(
+						std::format(R"({{"status":"INVALID","validation":{{"id":"token","description":"{}"}}}})", error_msg)
+					);
+			},
+			0
+		);			
 	}
 	
 	constexpr void register_webapi(
