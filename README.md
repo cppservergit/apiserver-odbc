@@ -53,7 +53,7 @@ The test environment is Ubuntu 24.04 with GCC 13.3, We used Canonical's Multipas
 ```
 multipass launch -n testvm -c 4 -m 2g -d 6g lts
 ```
-If you are not going to update the whole operating system then you can use `-d 4g` for 4GB of disk space.
+If you are not going to update the whole operating system, you can use `-d 4g` for 4GB of disk space.
 
 Update Ubuntu package list:
 ```
@@ -62,7 +62,7 @@ sudo apt update
 
 Install required packages:
 ```
-sudo apt install g++ libssl-dev libcurl4-openssl-dev uuid-dev libjson-c-dev unixodbc-dev tdsodbc make -y --no-install-recommends
+sudo apt install g++ libssl-dev libcurl4-openssl-dev uuid-dev libjson-c-dev liboath-dev unixodbc-dev tdsodbc make -y --no-install-recommends
 ```
 
 Optionally, if your VM has enough disk space (10GB) you can upgrade the rest of the operating system, it may take some minutes and require a restart of the VM:
