@@ -2,7 +2,7 @@ SHELL=bash
 DATE=$(shell printf '%(%Y%m%d)T')
 CC=g++
 CC_OPTS=-Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -march=x86-64 -mtune=intel -fno-extern-tls-init
-CC_LIBS=-lodbc -lcurl -lcrypto -luuid -ljson-c
+CC_LIBS=-lodbc -lcurl -lcrypto -luuid -ljson-c -loath
 CC_OBJS=env.o logger.o jwt.o httputils.o email.o pkeyutil.o odbcutil.o threadutil.o sql.o login.o util.o main.o
 
 apiserver: env.o logger.o jwt.o httputils.o email.o pkeyutil.o odbcutil.o threadutil.o sql.o login.o util.o main.o
