@@ -16,6 +16,6 @@ std::pair<bool, std::string> decrypt(std::string_view filename) noexcept;
 
 //validates a TOTP soft token given the token and the secret encoded in base32
 // if false then the error description is returned in the 2nd value of the std::pair
-std::pair<bool, std::string> is_valid_token(const std::string& token, const std::string& secretb32) noexcept;
+std::pair<bool, std::string> is_valid_token(const int seconds, const std::string& token, const std::string& secretb32) noexcept;
 
 #endif
