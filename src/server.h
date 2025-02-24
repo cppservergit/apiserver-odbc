@@ -611,10 +611,8 @@ struct server
 		logger::log("server", "info", std::format("hardware threads: {} GCC: {}", std::thread::hardware_concurrency(), __VERSION__));
 	}
 
-	constexpr void prebuilt_services()
+	constexpr void register_diagnostic_services()
 	{
-		logger::log("server", "info", "registering built-in diagnostic and security services...");
-		
 		register_webapi
 		(
 			webapi_path("/api/ping"), 
@@ -682,7 +680,15 @@ struct server
 				req.response.set_body(body, "text/plain; version=0.0.4");
 			},
 			false /* no security */
-		);
+		);		
+	}
+
+
+	constexpr void prebuilt_services()
+	{
+		logger::log("server", "info", "registering built-in diagnostic and security services...");
+		
+		register_diagnostic_services();
 
 		register_webapi
 		(
@@ -775,7 +781,7 @@ struct server
 						std::format(R"({{"status":"INVALID","validation":{{"id":"token","description":"{}"}}}})", error_msg)
 					);
 			},
-			0
+			false /* no security */
 		);			
 	}
 	
