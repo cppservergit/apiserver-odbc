@@ -693,7 +693,7 @@ struct server
 		register_webapi
 		(
 			webapi_path("/api/login"), 
-			"Default Login service using a PostgreSQL database",
+			"Default Login service using a database",
 			http::verb::POST, 
 			{
 				{"username", http::field_type::STRING, true},
@@ -767,14 +767,16 @@ struct server
 			webapi_path("/api/totp"), 
 			"Validate TOTP token given a base32 encoded secret",
 			http::verb::POST, 
-			{ 
+			{
+				{"duration", http::field_type::INTEGER, true}, 
 				{"token", http::field_type::STRING, true}, 
 				{"secret", http::field_type::STRING, true}
 			},
 			{ },		
 			[](http::request& req) 
 			{
-				if (auto[result, error_msg]{is_valid_token(req.get_param("token"), req.get_param("secret"))}; result )
+				const int s{std::stoi(req.get_param("duration"))};
+				if (auto[result, error_msg]{is_valid_token(s, req.get_param("token"), req.get_param("secret"))}; result )
 					req.response.set_body(R"({"status":"OK"})");
 				else
 					req.response.set_body(
