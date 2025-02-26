@@ -131,9 +131,17 @@ Using encryption is possible with this ODBC driver, we disable it by default for
 You may have noticed that we include the `APP` attribute on the connection string, this is useful to monitor API-Server++ connections on the server.
 
 ### Executing clean backups in SQL Server 2019
-It's necessary to perform a backup with the overwrite option, otherwise, when you restore you may see old data, and your backup file keeps growing, you can specify this option when using Microsoft's GUI tool Management Studio, but you can also do it via SQL or command line with `sqlcmd` using:
+Assuming you are using the same $HOME directory as in the steps above, you must remove the previous BAK file using:
 ```
-backup database demodb to disk='/var/opt/mssql/data/demodb.bak' with INIT
+sudo rm sql/data/testdb.bak
+```
+If you don't remove the BAK file, the command below will fail with a `permission denied` error.
+
+It's necessary to perform a backup with the overwrite option `with INIT`, otherwise, when you restore the database you may see old data, and your backup file keeps growing:
+```
+sudo docker exec -it mssql /opt/mssql-tools18/bin/sqlcmd -No -S localhost \
+   -U SA -P 'Basica2024' \
+   -Q 'backup database testdb to disk="/var/opt/mssql/data/testdb.bak" with INIT';
 ```
 It is also desirable to shrink your database before executing the backup using the [DBCC SHRINKDATABASE](https://learn.microsoft.com/en-us/sql/t-sql/database-console-commands/dbcc-shrinkdatabase-transact-sql?view=sql-server-ver16) SQL command.
 
