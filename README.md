@@ -1087,7 +1087,7 @@ BEGIN
 								CASE 
 									WHEN @status = 1 THEN 'LE002'
 									WHEN @status = 2 THEN 'LE003'
-									ELSE 'E099'
+									ELSE 'LE099'
 								END AS error_code, 
 								CASE 
 									WHEN @status = 1 THEN 'Account blocked'
