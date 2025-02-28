@@ -56,6 +56,7 @@ namespace smtp
 	{
 		curl = curl_easy_init();
 		if (curl) {
+			curl_easy_setopt(curl, CURLOPT_USE_SSL, (long)CURLUSESSL_ALL);
 			curl_easy_setopt(curl, CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
 			curl_easy_setopt(curl, CURLOPT_USERNAME, username.c_str());
 			curl_easy_setopt(curl, CURLOPT_PASSWORD, password.c_str());
