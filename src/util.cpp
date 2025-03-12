@@ -45,7 +45,7 @@ namespace util
 					if (' ' <= c && c <= '~') {
 						out << c;
 					} else {
-						out << "\\u" << std::setw(4) << std::setfill('0') << std::hex << static_cast<int>(c);
+						out << std::format("\\u{:04x}", static_cast<unsigned char>(c));
 					}
 			}
 		}
