@@ -5,8 +5,7 @@ namespace {
 	size_t get_proc_info(const std::string& filename, const std::string& token) noexcept
 	{
 		size_t total_memory = 0;
-		std::ifstream meminfo_file(filename);
-		if (meminfo_file.is_open()) {
+		if (std::ifstream meminfo_file(filename); meminfo_file.is_open()) {
 			std::string line;
 			while (std::getline(meminfo_file, line)) {
 				if (line.starts_with(token)) {
