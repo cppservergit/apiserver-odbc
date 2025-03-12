@@ -47,7 +47,7 @@
 #include "jwt.h"
 #include "email.h"
 
-constexpr char SERVER_VERSION[] = "API-Server++ v1.2.4";
+constexpr char SERVER_VERSION[] = "API-Server++ v1.2.5";
 constexpr const char* LOGGER_SRC {"server"};
 
 struct webapi_path
@@ -632,8 +632,23 @@ struct server
 			http::verb::GET, 
 			[this](http::request& req) 
 			{
-				constexpr auto json {R"({{"status": "OK", "data":[{{"pod": "{}", "server": "{}-{}"}}]}})"};
-				req.response.set_body(std::format(json, pod_name, SERVER_VERSION, CPP_BUILD_DATE));
+				constexpr auto json {R"({{"status": "OK", "data":[{{"pod": "{}", "server": "{}-{}","compiler":"{}"}}]}})"};
+				req.response.set_body(std::format(json, pod_name, SERVER_VERSION, CPP_BUILD_DATE, __VERSION__));
+			},
+			false /* no security */
+		);
+
+		register_webapi
+		(
+			webapi_path("/api/sysdate"), 
+			"Return server timestamp in local timezone",
+			http::verb::GET, 
+			[this](http::request& req) 
+			{
+				const auto now {std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now())};
+				const auto server_ts {std::format("{:%FT%T}", std::chrono::get_tzdb().current_zone()->to_local(now))};
+				constexpr auto json {R"({{"status": "OK", "data":[{{"pod":"{}","time":"{}"}}]}})"};
+				req.response.set_body(std::format(json, pod_name, server_ts));
 			},
 			false /* no security */
 		);
@@ -647,13 +662,13 @@ struct server
 			{
 				static const auto pool_size {env::pool_size()};
 				const double avg{ ( g_counter > 0 ) ? g_total_time / g_counter : 0 };
-				size_t _counter = g_counter;
-				int _active_threads = g_active_threads;
-				size_t _connections = g_connections;
-				const auto now {std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now())};
-				const auto server_ts {std::format("{:%FT%T}", std::chrono::get_tzdb().current_zone()->to_local(now))};
-				constexpr auto json {R"({{"status": "OK", "data":[{{"pod":"{}","time":"{}","totalRequests":{},"avgTimePerRequest":{:f},"connections":{},"activeThreads":{},"poolSize":{}}}]}})"};
-				req.response.set_body(std::format(json, pod_name, server_ts, _counter, avg, _connections, _active_threads, pool_size));
+				const size_t _counter = g_counter;
+				const int _active_threads = g_active_threads;
+				const size_t _connections = g_connections;
+				static const auto ram {util::get_total_memory()};
+				const auto mem_usage {util::get_memory_usage()};
+				constexpr auto json {R"({{"status": "OK", "data":[{{"pod":"{}","totalRequests":{},"avgTimePerRequest":{:f},"connections":{},"activeThreads":{},"poolSize":{},"totalRam":{},"memoryUsage":{}}}]}})"};
+				req.response.set_body(std::format(json, pod_name, _counter, avg, _connections, _active_threads, pool_size, ram, mem_usage));
 			},
 			false /* no security */
 		);
@@ -666,16 +681,18 @@ struct server
 			[this](http::request& req) 
 			{
 				std::string body;
-				body.reserve(1027);
+				body.reserve(2047);
 				const double avg{ ( g_counter > 0 ) ? g_total_time / g_counter : 0 };
 				size_t _counter = g_counter;
 				int _active_threads = g_active_threads;
 				size_t _connections = g_connections;
+				static const auto pool_size {env::pool_size()};
 				constexpr auto str {"# HELP {0} {1}.\n# TYPE {0} counter\n{0}{{pod=\"{2}\"}} {3}\n"};
 				constexpr auto str_avg {"# HELP {0} {1}.\n# TYPE {0} counter\n{0}{{pod=\"{2}\"}} {3:f}\n"};
 				body.append(std::format(str, "cpp_requests_total", "The number of HTTP requests processed by this container", pod_name, _counter));
 				body.append(std::format(str, "cpp_connections", "Client tcp-ip connections", pod_name, _connections));
 				body.append(std::format(str, "cpp_active_threads", "Active threads", pod_name, _active_threads));
+				body.append(std::format(str, "cpp_pool_size", "Thread pool size", pod_name, pool_size));
 				body.append(std::format(str_avg, "cpp_avg_time", "Average request processing time in milliseconds", pod_name, avg));
 				req.response.set_body(body, "text/plain; version=0.0.4");
 			},

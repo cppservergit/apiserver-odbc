@@ -1,5 +1,27 @@
 #include "util.h"
 
+namespace {
+	
+	size_t get_proc_info(const std::string& filename, const std::string& token) noexcept
+	{
+		size_t total_memory = 0;
+		std::ifstream meminfo_file(filename);
+		if (meminfo_file.is_open()) {
+			std::string line;
+			while (std::getline(meminfo_file, line)) {
+				if (line.starts_with(token)) {
+					std::istringstream iss{line};
+					std::string label;
+					iss >> label >> total_memory;
+					break;
+				}
+			}
+		} 
+		return total_memory;
+	}
+	
+}
+
 namespace util
 {
 	std::string today() noexcept
@@ -43,4 +65,15 @@ namespace util
 		}
 		return out.str();
 	}
+	
+	size_t get_total_memory() noexcept
+	{
+		return get_proc_info("/proc/meminfo", "MemTotal:");
+	}
+	
+	size_t get_memory_usage() noexcept
+	{
+		return get_proc_info("/proc/self/status", "VmRSS:");
+	}	
+	
 }

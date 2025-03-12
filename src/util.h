@@ -4,6 +4,7 @@
 #include <chrono>
 #include <format>
 #include <sstream>
+#include <fstream>
 
 namespace util
 {
@@ -24,8 +25,13 @@ namespace util
 
 	//return date as yyyy-mm-dd
 	std::string today() noexcept;
+	
 	std::string encode_json(const std::string& s) noexcept;
 	std::string encode_sql(std::string_view s) noexcept;
+	
+	//return total ram from /proc/meminfo
+	size_t get_total_memory() noexcept;
+	size_t get_memory_usage() noexcept;
 }
 
 #endif /* UTILS_H_ */
