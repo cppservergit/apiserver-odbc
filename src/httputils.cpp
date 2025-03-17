@@ -200,6 +200,7 @@ namespace
 
 namespace http
 {
+	
 	std::string get_uuid() noexcept 
 	{
 		std::array<unsigned char, 16> out;

@@ -39,7 +39,7 @@ namespace http
 	const std::string blob_path {"/var/blobs/"};
 	
 	std::string get_uuid() noexcept;
-
+	
 	enum class verb {GET, POST};
 
 	class invalid_payload_exception
