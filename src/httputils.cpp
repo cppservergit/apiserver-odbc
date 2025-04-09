@@ -327,8 +327,8 @@ namespace http
 	{
 		for (const auto& [k, v]:params) {
 			if (k.ends_with(".document")) {
-				std::string path{http::blob_path + v};
-				std::remove(path.c_str());
+				std::string _path{http::blob_path + v};
+				std::remove(_path.c_str());
 			}
 		}
 	}
