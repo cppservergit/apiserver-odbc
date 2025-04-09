@@ -1,11 +1,6 @@
-/*
- * email - send mail using libcurl (TLS-openssl)
- *
- *  Created on: June 6, 2023
- *      Author: Martin Cordova cppserver@martincordova.com - https://cppserver.com
- *      Disclaimer: some parts of this library may have been taken from sample code publicly available
- *		and written by third parties. Free to use in commercial projects, no warranties and no responsabilities assumed 
- *		by the author, use at your own risk. By using this code you accept the forementioned conditions.
+/**
+ * @file email.h
+ * @brief A wrapper to send mail using libcurl (TLS-openssl).
  */
 #ifndef EMAIL_H_
 #define EMAIL_H_
@@ -23,6 +18,14 @@
 #include "logger.h"
 #include "httputils.h"
 
+/**
+ * @brief A wrapper to send multipart mail using libcurl (TLS-openssl).
+ *
+ * Supports sending HTML body with optional attachments, it can print debug trace to stderr if enabled 
+ * using the function set_debug(true) to help detect problems.
+ * @author Martin Cordova cppserver@martincordova.com 
+ * @date June 6, 2023
+ */
 namespace smtp
 {
 	struct mail

@@ -47,7 +47,7 @@
 #include "jwt.h"
 #include "email.h"
 
-constexpr char SERVER_VERSION[] = "API-Server++ v1.2.5";
+constexpr char SERVER_VERSION[] = "API-Server++ v1.2.9";
 constexpr const char* LOGGER_SRC {"server"};
 
 struct webapi_path
@@ -202,7 +202,16 @@ struct server
 	std::mutex m_audit_mutex;
 	int m_signal {get_signalfd()};
 	
-	std::string pod_name;
+	constexpr std::string get_pod_name() {
+		std::array<char, 128> hostname{0};
+		gethostname(hostname.data(), hostname.size());
+		std::string temp;
+		temp.append(hostname.data());
+		return temp;
+	}
+	
+	const std::string pod_name{get_pod_name()};
+	const std::string server_start_date {std::format("{:%FT%T}", std::chrono::get_tzdb().current_zone()->to_local(std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now())))};
 	bool enable_audit {false};
 	
 	std::chrono::time_point<std::chrono::high_resolution_clock> _start_init{};
@@ -241,7 +250,7 @@ struct server
 	constexpr void send_error(http::request& req, const int status, std::string_view msg) 
 	{
 		if (status == 400)
-			logger::log(LOGGER_SRC, "error", std::format("HTTP status: {} IP: {} description: Bad request - {}", status, req.remote_ip, req.internals.errmsg), req.get_header("x-request-id"));
+			logger::log(LOGGER_SRC, "error", std::format("HTTP status: {} IP: {} {} description: Bad request - {}", status, req.remote_ip, req.path, req.internals.errmsg), req.get_header("x-request-id"));
 		
 		constexpr auto res {
 			"HTTP/1.1 {} {}\r\n"
@@ -295,14 +304,11 @@ struct server
 	{
 		std::string error_msg;
 		try {
-			if (req.isMultipart && req.save_blob_failed) 
-				throw http::save_blob_exception(std::format("error saving blob file to {}", http::blob_path));
-			
 			if (req.method == "OPTIONS") //preflight request
 				send_options(req);
 			else 
 				execute_service(req, api); //run lambda
-		} catch (const http::invalid_input_exception& e) { 
+		} catch (const http::invalid_input_exception& e) {
 			error_msg = e.what();
 			req.response.set_body(std::format(R"({{"status":"INVALID","validation":{{"id":"{}","description":"{}"}}}})", e.get_field_name(), e.get_error_description()));
 		} catch (const http::access_denied_exception& e) { 
@@ -317,9 +323,6 @@ struct server
 		} catch (const http::method_not_allowed_exception& e) { 
 			error_msg = e.what();
 			send_error(req, 405, "Method not allowed"); 
-		} catch (const http::save_blob_exception& e) { 
-			error_msg = e.what();
-			req.response.set_body(R"({"status":"ERROR","description":"Service error"})");
 		} catch (const sql::database_exception& e) { 
 			error_msg = e.what();
 			req.response.set_body(R"({"status":"ERROR","description":"Service error"})");
@@ -328,6 +331,7 @@ struct server
 			req.response.set_body(R"({"status":"ERROR","description":"Service error"})");
 		}
 		if (!error_msg.empty()) {
+			req.delete_blobs(); //in case request left orphan blobs
 			logger::log("service", "error", std::format("{} {}", req.path, error_msg), req.get_header("x-request-id"));
 		}
 	}
@@ -344,13 +348,7 @@ struct server
 
 		auto start = std::chrono::high_resolution_clock::now();
 
-		if (!req.internals.errcode && !req.payload.empty()) {
-			process_request(req, api);
-		} else {
-			if (req.payload.empty())
-				logger::log("service", "error", "HTTP 1/1 pipeline error, request is empty");
-			send_error(req, 400, "Bad request"); 
-		}
+		process_request(req, api);
 		
 		auto finish = std::chrono::high_resolution_clock::now();
 		std::chrono::duration <double>elapsed = finish - start;				
@@ -420,6 +418,15 @@ struct server
 		epoll_ctl(epoll_fd, EPOLL_CTL_ADD, fd, &event);
 	}
 
+	constexpr std::string get_socket_error(const int& fd) {
+		int error = 0;
+		socklen_t errlen = sizeof(error);
+		std::string errdesc{""};
+		if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &error, &errlen) == 0 && error != 0)
+			errdesc.append(std::strerror(error));
+		return errdesc;
+	}
+
 	constexpr void epoll_handle_error(epoll_event& ev) noexcept
 	{
 		--g_connections;
@@ -427,9 +434,9 @@ struct server
 			logger::log("epoll", "error", "EPOLLERR epoll data ptr is null - unable to retrieve request object");
 		else {
 			http::request& req = *static_cast<http::request*>(ev.data.ptr);
-			logger::log("epoll", "error", std::format("error on connection for FD: {} - closing it", req.fd));
+			logger::log("epoll", "error", std::format("error on connection for FD: {} {} - closing it", req.fd, get_socket_error(req.fd)));
 			if (int rc {close(req.fd)}; rc == -1)
-				logger::log("epoll", "error", std::format("close FAILED for FD: {} description: {}", req.fd, strerror(errno)));
+				logger::log("epoll", "error", std::format("close FAILED for FD: {} description: {}", req.fd, std::strerror(errno)));
 		}
 	}
 
@@ -477,16 +484,21 @@ struct server
 			epoll_ctl(epoll_fd, EPOLL_CTL_ADD, fd, &event);
 		}
 	}
-
-	constexpr void epoll_abort_request(http::request& req) noexcept 
+	
+	constexpr void epoll_abort_request(http::request& req, const int status_code) noexcept 
 	{
-		logger::log("epoll", "error", std::format("API not found: {} from IP {}", req.path, req.remote_ip), req.get_header("x-request-id"));
-		send_error(req, 404, "Resource not found");
+		std::string msg {"Bad request"};
+		if (status_code==404) {
+			logger::log("epoll", "error", std::format("API not found: {} from IP {}", req.path, req.remote_ip), req.get_header("x-request-id"));
+			msg = "Resource not found";
+		}
+		send_error(req, status_code, msg);
 		epoll_event event;
 		event.events = EPOLLOUT | EPOLLET | EPOLLRDHUP;
 		event.data.ptr = &req;
 		epoll_ctl(req.epoll_fd, EPOLL_CTL_MOD, req.fd, &event);		
 	}
+
 
 	constexpr void producer(const worker_params& wp) noexcept
 	{
@@ -497,13 +509,18 @@ struct server
 
 	constexpr void run_async_task(http::request& req) noexcept
 	{
+		if (req.internals.errcode) {
+			req.delete_blobs();
+			epoll_abort_request(req, 400);
+			return;
+		} 
+				
 		if (auto obj = webapi_catalog.find(req.path); obj != webapi_catalog.end()) 
 		{
 			worker_params wp {req, obj->second};
 			producer(wp);
-		}
-		else 
-			epoll_abort_request(req);
+		} else 
+			epoll_abort_request(req, 404);
 	}
 
 	constexpr void epoll_handle_read(epoll_event& ev) noexcept
@@ -667,8 +684,8 @@ struct server
 				const size_t _connections = g_connections;
 				static const auto ram {util::get_total_memory()};
 				const auto mem_usage {util::get_memory_usage()};
-				constexpr auto json {R"({{"status": "OK", "data":[{{"pod":"{}","totalRequests":{},"avgTimePerRequest":{:f},"connections":{},"activeThreads":{},"poolSize":{},"totalRam":{},"memoryUsage":{}}}]}})"};
-				req.response.set_body(std::format(json, pod_name, _counter, avg, _connections, _active_threads, pool_size, ram, mem_usage));
+				constexpr auto json {R"({{"status": "OK", "data":[{{"pod":"{}","startDate":"{}","totalRequests":{},"avgTimePerRequest":{:f},"connections":{},"activeThreads":{},"poolSize":{},"totalRam":{},"memoryUsage":{}}}]}})"};
+				req.response.set_body(std::format(json, pod_name, server_start_date, _counter, avg, _connections, _active_threads, pool_size, ram, mem_usage));
 			},
 			false /* no security */
 		);
@@ -739,46 +756,6 @@ struct server
 			false /* no security */
 		);
 		
-		auto get_roles = [](const auto &role_list) {
-			std::string body;
-			for (const auto& role: role_list)
-				body.append(std::format(R"({{"rolename":"{}"}},)", role));
-			if (!body.empty()) 
-				body.pop_back();
-			return body;
-		};
-		
-		auto get_inputs = [](const auto &inputs) {
-			std::string body;
-			std::array<std::string, 4> types {"int", "double", "string", "date"};
-			for (const auto& input: inputs)
-				body.append(std::format(R"({{"name":"{}","data-type":"{}","required":"{}"}},)", input.get_name(), types[int(input.get_type()) - 1], input.get_required()));
-			if (!body.empty()) 
-				body.pop_back();
-			return body;
-		};		
-		
-		register_webapi
-		(
-			webapi_path("/api/docs"), 
-			"Return API documentation in JSON format",
-			http::verb::GET, 
-			[this, &get_roles, &get_inputs](http::request& req) 
-			{
-				std::string body;
-				body.reserve(32767);
-				for (const auto& [key, api]: webapi_catalog) {
-					auto cmd {(api.verb == http::verb::GET) ? "GET" : "POST"};
-					auto roles {get_roles(api.roles)};
-					auto inputs {get_inputs(api.rules)};
-					body.append(std::format(R"({{"path":"{}","description":"{}","http-command":"{}","is-secure":"{}","roles":[{}],"inputs":[{}]}},)", key, api.description, cmd, api.is_secure, roles, inputs));
-				}
-				body.pop_back();
-				req.response.set_body(std::format(R"({{"data":[{}]}})", body));
-			},
-			false /* no security */
-		);
-		
 		register_webapi
 		(
 			webapi_path("/api/totp"), 
@@ -843,10 +820,6 @@ struct server
 	{
 		prebuilt_services();
 		enable_audit = env::enable_audit();
-		std::array<char, 128> hostname{0};
-		gethostname(hostname.data(), hostname.size());
-		pod_name.append(hostname.data());
-
 		print_server_info();
 
 		const auto pool_size {env::pool_size()};

@@ -1,12 +1,8 @@
-/*
- * logger - JSON log output to stderr for Grafana Loki
- *
- *  Created on: Feb 21, 2023
- *      Author: Martin Cordova cppserver@martincordova.com - https://cppserver.com
- *      Disclaimer: some parts of this library may have been taken from sample code publicly available
- *		and written by third parties. Free to use in commercial projects, no warranties and no responsabilities assumed 
- *		by the author, use at your own risk. By using this code you accept the forementioned conditions.
+/**
+ * @file logger.h
+ * @brief Provides centralized log with Loki compatible format.
  */
+
 #ifndef LOGGER_H_
 #define LOGGER_H_
 
@@ -14,9 +10,16 @@
 #include <string_view>
 #include <thread>
 #include <iostream>
-#include <sstream>
 #include <format>
 
+/**
+ * @brief Provides centralized log with Loki compatible format.
+ *
+ * Prints log trace to sdterr using a Grafana Loki compatible JSON format,
+ * the log trace includes the current thread-id
+ *  @date Feb 21, 2023
+ *  @author Martin Cordova cppserver@martincordova.com
+ */
 namespace logger
 {
 	void log(std::string_view source, std::string_view level, std::string_view msg, std::string_view x_request_id = "") noexcept;

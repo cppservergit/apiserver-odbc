@@ -1,12 +1,9 @@
-/*
- * json - minimal JSON parser for simple JSON objects like {"a":"value_a","b":"value_b","c":195.76}
- *
- *  Created on: Feb 21, 2023
- *      Author: Martin Cordova cppserver@martincordova.com - https://cppserver.com
- *      Disclaimer: some parts of this library may have been taken from sample code publicly available
- *		and written by third parties. Free to use in commercial projects, no warranties and no responsabilities assumed 
- *		by the author, use at your own risk. By using this code you accept the forementioned conditions.
+/**
+ * @file json.h
+ * @brief minimal JSON parser for simple JSON objects
  */
+
+
  
 #ifndef JSON_H_
 #define JSON_H_
@@ -17,6 +14,14 @@
 #include <json-c/json.h>
 #include "util.h"
 
+/**
+ *  @brief minimal JSON parser for simple JSON objects
+ * 
+ *  This is a wrapper of the json-c library, provides a C++ API to easily parse
+ *  simple JSON objects like {"a":"value_a","b":"value_b","c":195.76}
+ *  @date Feb 21, 2023
+ *  @author Martin Cordova cppserver@martincordova.com
+ */
 namespace json
 {
 	class invalid_json_exception
@@ -30,6 +35,9 @@ namespace json
             std::string m_msg;
 	};		
 
+	/**
+	* @brief For internal use, parses the JSON string, returns error information in case it fails
+	*/
 	inline struct json_object* json_tokener_parse_verbose2(std::string_view str, enum json_tokener_error *error)
 	{
 		struct json_tokener *tok;
@@ -55,6 +63,12 @@ namespace json
 		return obj;
 	}
 
+	/**
+	* @brief Returns a std::unordered_map<std::string, std::string> that contains the attribute names and the values of the JSON object
+	* 
+	* throws json::invalid_json_exception if the parser fails to parse the JSON string, also
+	* a log trace will be printed to stderr using the prefix [DEBUG][JSON] with the error description returned by the native json-c library
+	*/
 	inline auto parse(std::string_view json)
 	{
 		enum json_tokener_error jerr;

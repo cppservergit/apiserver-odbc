@@ -58,14 +58,17 @@ namespace
 		}
 	}	
 
-	constexpr bool save_blob(const std::string& filename, const std::string& content)
+	constexpr auto save_blob(const std::string& filename, const std::string& content)
 	{
-		std::ofstream ofs(filename, std::ios::binary);
-		if (ofs.is_open()) {
+		bool result{true};
+		std::string errmsg {""};
+		if (std::ofstream ofs(filename, std::ios::binary); ofs.is_open()) {
 			ofs << content;
-			return true;
-		} else 
-			return false;
+		} else {
+			result = false;
+			errmsg = std::format("save_blob() failed: {}", std::strerror(errno));
+		}
+		return std::make_pair(result, errmsg);
 	}
 
 	//upload support functions---------
@@ -320,6 +323,16 @@ namespace http
 		return true;
 	}
 
+	void request::delete_blobs()
+	{
+		for (const auto& [k, v]:params) {
+			if (k.ends_with(".document")) {
+				std::string path{http::blob_path + v};
+				std::remove(path.c_str());
+			}
+		}
+	}
+
 	void request::clear() 
 	{
 		response.clear();
@@ -555,21 +568,18 @@ namespace http
 	void request::parse_form() 
 	{
 		auto fields = parse_multipart(this);
-		bool _save {true};
 		for (auto& f: fields) {
 			if (f.filename.empty()) {
 				params.try_emplace(f.name, f.data);
-				if (f.name=="title" && f.data.empty())
-					_save = false;
 			} else {
 				std::string file_uuid {get_uuid()};
 				std::string save_path {blob_path + file_uuid};
-				params.try_emplace( "content_len", std::to_string( f.data.size() ) );
-				params.try_emplace( "content_type", f.content_type);
-				params.try_emplace( "document", file_uuid);
-				params.try_emplace( "filename", f.filename);
-				if (_save)
-					save_blob_failed = !save_blob(save_path, f.data);
+				params.try_emplace( f.name + ".content_len", std::to_string( f.data.size() ) );
+				params.try_emplace( f.name + ".content_type", f.content_type);
+				params.try_emplace( f.name + ".document", file_uuid);
+				params.try_emplace( f.name + ".filename", f.filename);
+				if (auto [result, errdesc] {save_blob(save_path, f.data)}; !result)
+					throw http::invalid_payload_exception(errdesc);
 			}
 		}
 	}
