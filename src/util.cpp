@@ -74,5 +74,53 @@ namespace util
 	{
 		return get_proc_info("/proc/self/status", "VmRSS:");
 	}	
+
+	std::string decode_base64(const std::string& base64) {
+		static const std::string base64Chars =
+			"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+			"abcdefghijklmnopqrstuvwxyz"
+			"0123456789+/";
+
+		// Static decoding table to avoid recomputation
+		static std::vector<int> decodingTable = []() {
+			std::vector<int> table(256, -1);
+			for (size_t i = 0; i < base64Chars.size(); ++i) {
+				table[static_cast<unsigned char>(base64Chars[i])] = static_cast<int>(i);
+			}
+			return table;
+		}();
+
+		if (base64.empty()) {
+			return ""; // Return early for empty input
+		}
+
+		// Reserve capacity for the decoded string
+		std::string decodedString;
+		decodedString.reserve((base64.length() * 3) / 4);
+
+		int bitGroup = 0; // Accumulates bits from the input
+		int bitCount = 0; // Tracks how many bits are in the accumulator
+
+		for (char c : base64) {
+			if (std::isspace(c)) continue; // Skip whitespace
+			if (c == '=') break;          // Stop at padding
+
+			int value = decodingTable[static_cast<unsigned char>(c)];
+			if (value == -1) {
+				throw std::invalid_argument("Invalid Base64 character encountered.");
+			}
+
+			// Accumulate bits and extract bytes
+			bitGroup = (bitGroup << 6) | value;
+			bitCount += 6;
+
+			while (bitCount >= 8) {
+				bitCount -= 8;
+				decodedString += static_cast<char>((bitGroup >> bitCount) & 0xFF);
+			}
+		}
+
+		return decodedString;
+	}
 	
 }

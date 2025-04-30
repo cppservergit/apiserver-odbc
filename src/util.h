@@ -5,6 +5,10 @@
 #include <format>
 #include <sstream>
 #include <fstream>
+#include <iostream>
+#include <string>
+#include <stdexcept>
+#include <vector>
 
 namespace util
 {
@@ -32,6 +36,8 @@ namespace util
 	//return total ram from /proc/meminfo
 	size_t get_total_memory() noexcept;
 	size_t get_memory_usage() noexcept;
+	
+	std::string decode_base64(const std::string& base64);
 }
 
 #endif /* UTILS_H_ */

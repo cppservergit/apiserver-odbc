@@ -64,6 +64,10 @@ namespace
 		std::string errmsg {""};
 		if (std::ofstream ofs(filename, std::ios::binary); ofs.is_open()) {
 			ofs << content;
+			 if (ofs.fail()) {
+				errmsg = std::format("save_blob() failed saving content: {}", std::strerror(errno));
+				result = false;
+			 }		
 		} else {
 			result = false;
 			errmsg = std::format("save_blob() failed: {}", std::strerror(errno));
@@ -385,6 +389,8 @@ namespace http
 				//prevent sql injection
 				replace_str(value, "'", "''");
 				replace_str(value, "\\", "");
+				replace_str(value, "<", "&lt;");
+				replace_str(value, ">", "&gt;");
 				break;
 		}
 	}
