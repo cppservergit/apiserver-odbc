@@ -47,7 +47,7 @@
 #include "jwt.h"
 #include "email.h"
 
-constexpr char SERVER_VERSION[] = "API-Server++ v1.3.4";
+constexpr char SERVER_VERSION[] = "API-Server++ v1.3.5";
 constexpr const char* LOGGER_SRC {"server"};
 
 struct webapi_path
@@ -471,12 +471,11 @@ struct server
 			if (fd == -1) {
 				if (errno != EAGAIN && errno != EWOULDBLOCK) 
 					logger::log("epoll", "error", std::format("connection accept FAILED for epoll FD: {} description: {}", epoll_fd, strerror(errno)));
-				break;
+				return;
 			} else {
 				++g_connections;
 				const char* remote_ip = inet_ntoa(((struct sockaddr_in*)&addr)->sin_addr);
-				auto [iter, success] {buffers.try_emplace(fd, epoll_fd, fd, remote_ip)};
-				if (success) {
+				if (auto [iter, success] {buffers.try_emplace(fd, epoll_fd, fd, remote_ip)}; success) {
 					epoll_event ev; 
 					ev.events = EPOLLIN | EPOLLET | EPOLLRDHUP;
 					ev.data.ptr = &iter->second;
@@ -504,7 +503,7 @@ struct server
 	}
 
 
-	constexpr void producer(const worker_params& wp) noexcept
+	constexpr void producer(worker_params& wp) noexcept
 	{
 		std::scoped_lock lock{m_mutex};
 		m_queue.push(std::move(wp));
