@@ -9,6 +9,7 @@ namespace
 			unsigned short int read_env(const char* name, unsigned short int default_value) const noexcept;
 			unsigned short int port{read_env("CPP_PORT", 8080)};
 			unsigned short int http_log{read_env("CPP_HTTP_LOG", 0)};
+			unsigned short int disable_ping_log{read_env("CPP_DISABLE_PING_LOG", 0)};
 			unsigned short int login_log{read_env("CPP_LOGIN_LOG", 0)};
 			unsigned short int pool_size{read_env("CPP_POOL_SIZE", 4)};
 			unsigned short int jwt_expiration{read_env("CPP_JWT_EXP", 600)};
@@ -54,6 +55,9 @@ namespace env
 
 	unsigned short int http_log_enabled() noexcept 
 	{ return ev.http_log; }
+
+	unsigned short int disable_ping_log() noexcept 
+	{ return ev.disable_ping_log; }
 
 	unsigned short int pool_size() noexcept 
 	{ return ev.pool_size; }

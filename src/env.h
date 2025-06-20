@@ -29,12 +29,15 @@ namespace env
 	/** @brief returns CPP_HTTP_LOG environment variable */
 	unsigned short int http_log_enabled() noexcept;
 	
+	/** @brief returns CPP_HTTP_LOG environment variable */
+	unsigned short int disable_ping_log() noexcept;
+
 	/** @brief returns CPP_POOL_SIZE environment variable */
 	unsigned short int pool_size() noexcept;
 	
 	/** @brief returns CPP_LOGIN_LOG environment variable */
 	unsigned short int login_log_enabled() noexcept;
-	
+
 	/** @brief returns CPP_JWT_EXP environment variable */
 	unsigned short int jwt_expiration() noexcept;
 	

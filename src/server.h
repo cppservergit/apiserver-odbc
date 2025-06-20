@@ -47,7 +47,7 @@
 #include "jwt.h"
 #include "email.h"
 
-constexpr char SERVER_VERSION[] = "API-Server++ v1.3.1";
+constexpr char SERVER_VERSION[] = "API-Server++ v1.3.4";
 constexpr const char* LOGGER_SRC {"server"};
 
 struct webapi_path
@@ -133,7 +133,7 @@ constexpr auto consumer = [](std::stop_token tok, auto srv) noexcept
 		if (tok.stop_requested()) { lock.unlock(); break; }
 		
 		//get task
-		auto params = srv->m_queue.front();
+		auto params = std::move(srv->m_queue.front());
 		srv->m_queue.pop();
 		lock.unlock();
 		
@@ -329,7 +329,13 @@ struct server
 		} catch (const json::invalid_json_exception& e) {
 			error_msg = e.what();
 			req.response.set_body(R"({"status":"ERROR","description":"Service error"})");
-		}
+		} catch (const std::exception& e) {
+			error_msg = e.what();
+			req.response.set_body(R"({"status":"ERROR","description":"Service error"})");
+		} catch (...) {
+			error_msg = "Unknown exception";
+			req.response.set_body(R"({"status":"ERROR","description":"Service error"})");
+        }
 		if (!error_msg.empty()) {
 			req.delete_blobs(); //in case request left orphan blobs
 			logger::log("service", "error", std::format("{} {}", req.path, error_msg), req.get_header("x-request-id"));
@@ -338,6 +344,7 @@ struct server
 
 	constexpr void log_request(const http::request& req, double duration) noexcept
 	{
+		if (req.path.ends_with("/api/ping") && env::disable_ping_log()) return;
 		constexpr auto msg {"fd={} remote-ip={} {} path={} elapsed-time={:f} user={}"};
 		logger::log("access-log", "info", std::format(msg, req.fd, req.remote_ip, req.method, req.path, duration, req.user_info.login), req.get_header("x-request-id"));
 	}
@@ -394,7 +401,7 @@ struct server
 		int fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 		int on = 1;
 		setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
-		fcntl(fd, F_SETFD, fcntl(fd, F_GETFD, 0) | O_NONBLOCK);
+		fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK);
 		struct sockaddr_in addr;
 		memset(&addr, 0, sizeof(addr));
 		addr.sin_port = htons(port);
@@ -406,7 +413,7 @@ struct server
 			exit(-1);
 		}
 		listen(fd, SOMAXCONN);
-		logger::log("epoll", "info", std::format("listen socket FD: {} port: {}", fd, port));
+		logger::log("epoll", "info", std::format("listen non-blocking socket FD: {} port: {}", fd, port));
 		return fd;
 	}
 
@@ -437,6 +444,7 @@ struct server
 			logger::log("epoll", "error", std::format("error on connection for FD: {} {} - closing it", req.fd, get_socket_error(req.fd)));
 			if (int rc {close(req.fd)}; rc == -1)
 				logger::log("epoll", "error", std::format("close FAILED for FD: {} description: {}", req.fd, std::strerror(errno)));
+			buffers.erase(req.fd);
 		}
 	}
 
@@ -449,39 +457,35 @@ struct server
 			http::request& req = *static_cast<http::request*>(ev.data.ptr);
 			if (int rc {close(req.fd)}; rc == -1)
 				logger::log("epoll", "error", std::format("close FAILED for FD: {} description: {}", req.fd, strerror(errno)));
+			buffers.erase(req.fd);
 		}
 	}
 
-	constexpr void epoll_handle_connect(int listen_fd, int epoll_fd) noexcept
+	constexpr void epoll_handle_connect(const int& listen_fd, const int& epoll_fd) noexcept
 	{
-		struct sockaddr addr;
-		socklen_t len;
-		len = sizeof addr;
-		int fd { accept4(listen_fd, &addr, &len, SOCK_NONBLOCK) };
-		if (fd == -1) {
-			logger::log("epoll", "error", std::format("connection accept FAILED for epoll FD: {} description: {}", epoll_fd, strerror(errno)));
-		} else {
-			++g_connections;
-			const char* remote_ip = inet_ntoa(((struct sockaddr_in*)&addr)->sin_addr);
-			epoll_event event;
-			if (buffers.contains(fd)) {
-				http::request& req = buffers[fd];
-				req.clear();
-				req.remote_ip = std::string(remote_ip);
-				req.fd = fd;
-				req.epoll_fd = epoll_fd;
-				event.data.ptr = &req;
+		while (true) {
+			struct sockaddr addr;
+			socklen_t len;
+			len = sizeof addr;
+			int fd { accept4(listen_fd, &addr, &len, SOCK_NONBLOCK) };
+			if (fd == -1) {
+				if (errno != EAGAIN && errno != EWOULDBLOCK) 
+					logger::log("epoll", "error", std::format("connection accept FAILED for epoll FD: {} description: {}", epoll_fd, strerror(errno)));
+				break;
 			} else {
+				++g_connections;
+				const char* remote_ip = inet_ntoa(((struct sockaddr_in*)&addr)->sin_addr);
 				auto [iter, success] {buffers.try_emplace(fd, epoll_fd, fd, remote_ip)};
-				if (success)
-					event.data.ptr = &iter->second;
-				else {
+				if (success) {
+					epoll_event ev; 
+					ev.events = EPOLLIN | EPOLLET | EPOLLRDHUP;
+					ev.data.ptr = &iter->second;
+					epoll_ctl(epoll_fd, EPOLL_CTL_ADD, fd, &ev);
+				} else {
 					logger::log("epoll", "error", std::format("error creating a new request object into the hashmap with fd: {}", fd));
-					return;
+					break;
 				}
 			}
-			event.events = EPOLLIN | EPOLLET | EPOLLRDHUP;
-			epoll_ctl(epoll_fd, EPOLL_CTL_ADD, fd, &event);
 		}
 	}
 	
@@ -503,7 +507,7 @@ struct server
 	constexpr void producer(const worker_params& wp) noexcept
 	{
 		std::scoped_lock lock{m_mutex};
-		m_queue.push(wp);
+		m_queue.push(std::move(wp));
 		m_cond.notify_all();
 	}
 
@@ -529,11 +533,17 @@ struct server
 		while (true) 
 		{
 			int count = read(req.fd, req.payload.data(), req.payload.available_size());
-			if (count == -1 && (errno == EAGAIN || errno == EWOULDBLOCK))
+			if (count==0) break;
+			if (count == -1) {
+				if (errno != EAGAIN && errno != EWOULDBLOCK) {
+					logger::log("epoll", "error", std::format("read failed for FD: {} description: {}", req.fd, strerror(errno)));
+					close(req.fd);
+				}
 				return;
+			}
 			if (count > 0 && read_request(req, count)) {
-					run_async_task(req);
-					break;
+				run_async_task(req);
+				return;
 			}
 		}
 	}
@@ -543,7 +553,7 @@ struct server
 		http::request& req = *static_cast<http::request*>(ev.data.ptr);
 		if (req.response.write(req.fd)) {
 			epoll_event event;
-			event.events = EPOLLIN | EPOLLET | EPOLLRDHUP;
+			event.events = EPOLLET | EPOLLRDHUP;
 			event.data.ptr = &req;
 			epoll_ctl(req.epoll_fd, EPOLL_CTL_MOD, req.fd, &event);
 		}
@@ -563,7 +573,7 @@ struct server
 
 	constexpr void epoll_loop(int listen_fd, int epoll_fd) noexcept
 	{
-		constexpr int MAXEVENTS = 64;
+		constexpr int MAXEVENTS = 1024;
 		std::array<epoll_event, MAXEVENTS> events;
 
 		while (true)
@@ -649,7 +659,7 @@ struct server
 			http::verb::GET, 
 			[this](http::request& req) 
 			{
-				constexpr auto json {R"({{"status": "OK", "data":[{{"pod": "{}", "server": "{}-{}","compiler":"{}"}}]}})"};
+				constexpr auto json {R"({{"status":"OK","data":[{{"pod":"{}","server":"{}-{}","compiler":"{}"}}]}})"};
 				req.response.set_body(std::format(json, pod_name, SERVER_VERSION, CPP_BUILD_DATE, __VERSION__));
 			},
 			false /* no security */
@@ -818,6 +828,7 @@ struct server
 
 	constexpr void start()
 	{
+		curl_global_init(CURL_GLOBAL_ALL);
 		prebuilt_services();
 		enable_audit = env::enable_audit();
 		print_server_info();
@@ -859,6 +870,7 @@ struct server
 		m_audit_cond.notify_all();
 		audit_engine.join();
 		
+		curl_global_cleanup();
 	}
 	
 };
