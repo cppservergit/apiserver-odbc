@@ -827,7 +827,6 @@ struct server
 
 	constexpr void start()
 	{
-		curl_global_init(CURL_GLOBAL_ALL);
 		prebuilt_services();
 		enable_audit = env::enable_audit();
 		print_server_info();
@@ -868,8 +867,6 @@ struct server
 		audit_stop.request_stop();
 		m_audit_cond.notify_all();
 		audit_engine.join();
-		
-		curl_global_cleanup();
 	}
 	
 };

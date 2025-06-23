@@ -1,5 +1,42 @@
 #include "email.h"
 
+namespace {
+
+	/**
+	 * @class CurlGlobalInitializer
+	 * @brief An RAII wrapper to manage libcurl's global state.
+	 */
+	class CurlGlobalInitializer {
+	public:
+		/**
+		 * @brief Constructor that initializes libcurl.
+		 */
+		CurlGlobalInitializer() {
+			if (CURLcode res = curl_global_init(CURL_GLOBAL_DEFAULT); res != CURLE_OK) {
+				std::cerr << "Fatal: Failed to initialize libcurl globally." << std::endl;
+				std::abort();
+			}
+		}
+
+		/**
+		 * @brief Destructor that cleans up libcurl's global state.
+		 */
+		~CurlGlobalInitializer() {
+			curl_global_cleanup();
+		}
+
+		// Delete copy and move semantics to ensure singleton-like behavior.
+		CurlGlobalInitializer(const CurlGlobalInitializer&) = delete;
+		CurlGlobalInitializer& operator=(const CurlGlobalInitializer&) = delete;
+		CurlGlobalInitializer(CurlGlobalInitializer&&) = delete;
+		CurlGlobalInitializer& operator=(CurlGlobalInitializer&&) = delete;
+	};
+
+	/// @brief The single global instance that manages libcurl's lifetime.
+	const CurlGlobalInitializer global_curl_initializer;
+
+}
+
 namespace smtp
 {
 	
