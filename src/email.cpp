@@ -13,7 +13,7 @@ namespace {
 		 */
 		CurlGlobalInitializer() {
 			if (CURLcode res = curl_global_init(CURL_GLOBAL_DEFAULT); res != CURLE_OK) {
-				std::cerr << "Fatal: Failed to initialize libcurl globally." << std::endl;
+				std::cerr << "Fatal: Failed to initialize libcurl globally.\n";
 				std::abort();
 			}
 		}

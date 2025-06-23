@@ -47,7 +47,7 @@
 #include "jwt.h"
 #include "email.h"
 
-constexpr char SERVER_VERSION[] = "API-Server++ v1.3.5";
+constexpr char SERVER_VERSION[] = "API-Server++ v1.3.6";
 constexpr const char* LOGGER_SRC {"server"};
 
 struct webapi_path
