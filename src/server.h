@@ -47,7 +47,7 @@
 #include "jwt.h"
 #include "email.h"
 
-constexpr char SERVER_VERSION[] = "API-Server++ v1.3.6";
+constexpr char SERVER_VERSION[] = "API-Server++ v1.3.7";
 constexpr const char* LOGGER_SRC {"server"};
 
 struct webapi_path
@@ -140,10 +140,8 @@ constexpr auto consumer = [](std::stop_token tok, auto srv) noexcept
 		//run task
 		srv->http_server(params.req, params.api);
 		
-		epoll_event event;
-		event.events = EPOLLOUT | EPOLLET | EPOLLRDHUP;
-		event.data.ptr = &params.req;
-		epoll_ctl(params.req.epoll_fd, EPOLL_CTL_MOD, params.req.fd, &event);
+		std::scoped_lock ready_lock{srv->m_ready_mutex};
+		srv->m_ready_queue.push(std::move(params.req));
 		
 	}
 	//ending task - free resources
@@ -179,7 +177,7 @@ struct server
 	std::atomic<size_t> g_connections{0};
 
 	struct worker_params {
-		http::request& req;
+		http::request req;
 		const webapi& api;
 	};
 
@@ -201,6 +199,10 @@ struct server
 	std::queue<audit_trail> m_audit_queue;
 	std::mutex m_audit_mutex;
 	int m_signal {get_signalfd()};
+
+	std::mutex m_ready_mutex;
+	std::queue<http::request> m_ready_queue;
+
 	
 	constexpr std::string get_pod_name() {
 		std::array<char, 128> hostname{0};
@@ -503,6 +505,22 @@ struct server
 	}
 
 
+	constexpr void check_ready_queue()
+	{
+		std::lock_guard lock(m_ready_mutex);
+		while (!m_ready_queue.empty()) {
+			auto req = std::move(m_ready_queue.front());
+			m_ready_queue.pop();
+			auto fd {req.fd};
+			auto epoll_fd {req.epoll_fd};
+			buffers[fd] = std::move(req);
+			epoll_event event;
+			event.events = EPOLLOUT | EPOLLET | EPOLLRDHUP;
+			event.data.ptr = &buffers[fd];
+			epoll_ctl(epoll_fd, EPOLL_CTL_MOD, fd, &event);
+		}		
+	}
+
 	constexpr void producer(worker_params& wp) noexcept
 	{
 		std::scoped_lock lock{m_mutex};
@@ -520,7 +538,7 @@ struct server
 				
 		if (auto obj = webapi_catalog.find(req.path); obj != webapi_catalog.end()) 
 		{
-			worker_params wp {req, obj->second};
+			worker_params wp {std::move(req), obj->second};
 			producer(wp);
 		} else 
 			epoll_abort_request(req, 404);
@@ -573,11 +591,16 @@ struct server
 	constexpr void epoll_loop(int listen_fd, int epoll_fd) noexcept
 	{
 		constexpr int MAXEVENTS = 1024;
+		constexpr int EPOLL_TIMEOUT_MS = 5;
 		std::array<epoll_event, MAXEVENTS> events;
 
 		while (true)
 		{
-			int n_events = epoll_wait(epoll_fd, events.data(), MAXEVENTS, -1);
+			int n_events = epoll_wait(epoll_fd, events.data(), MAXEVENTS, EPOLL_TIMEOUT_MS);
+			
+			check_ready_queue();
+			if (n_events < 0) continue;
+			
 			for (int i = 0; i < n_events; i++)
 			{
 				if (events[i].events & EPOLLRDHUP || events[i].events & EPOLLHUP)
