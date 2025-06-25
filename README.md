@@ -972,6 +972,10 @@ sudo chmod 777 /var/blobs
 
 When using API-Server++ as a container on Kubernetes, volumes and volume mappings will be used to map /var/blobs to the actual storage destination on the Kubernetes Cluster. This is transparent to API-Server++.
 
+## Thread safety
+
+API-Server++ has been tested for data races with `-fsanitizer=thread` while receiving a load of concurrent requests and passed OK. A minimum of data objects are shared between the EPOLL thread and worker threads using proper locks to avoid data races.
+
 ## Memory safety
 
 API-Sever++ has been tested for memory safety (leaks and overflows) with dynamic analysis instrumentation tools including Valgrind and GCC memory sanitizer (-fsanitize=leak and -fsanitize=address), It has passed all tests, with no leaks or warning of any sort when running a load of 2000 concurrent connections executing a variety of API requests involving database operations as well as diagnostics.
