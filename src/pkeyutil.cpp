@@ -5,6 +5,7 @@
 #include <iterator>
 #include <memory>
 #include <format>
+#include <chrono>
 
 #include <openssl/pem.h>
 #include <openssl/evp.h>
@@ -25,7 +26,7 @@ namespace {
     };
 
     struct OATH_Free_Deleter {
-        void operator()(void* ptr) const { free(ptr); }
+        void operator()(char* ptr) const { free(ptr); }
     };
 
     using unique_EVP_PKEY = std::unique_ptr<EVP_PKEY, EVP_PKEY_Deleter>;
@@ -108,7 +109,10 @@ TokenValidationResult is_valid_token(const int seconds, const std::string& token
         return {false, std::format("liboath oath_base32_decode() failed: {}", oath_strerror(rc))};
     }
 
-    rc = oath_totp_validate(secret.get(), secretlen, time(NULL), seconds, 0, 0, token.c_str());
+	// Use std::chrono to get the current time as a time_t	
+	const auto now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+
+    rc = oath_totp_validate(secret.get(), secretlen, now, seconds, 0, 0, token.c_str());
     if (rc != OATH_OK) {
         oath_done();
         return {false, std::format("liboath oath_totp_validate() failed: {}", oath_strerror(rc))};
