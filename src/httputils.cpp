@@ -1,5 +1,6 @@
 #include "httputils.h"
 #include <utility>
+#include <future>
 
 namespace
 {
@@ -741,7 +742,7 @@ namespace http
 	{
 		const auto mail_body {get_mail_body(this, body)};
 		const auto x_request_id {get_header("x-request-id")};
-		auto task = [to, cc, subject, mail_body, attachment, attachment_filename, x_request_id]() {
+		auto async_task = [to, cc, subject, mail_body, attachment, attachment_filename, x_request_id]() {
 			smtp::mail m(env::get_str("CPP_MAIL_SERVER"), env::get_str("CPP_MAIL_USER"), env::get_str("CPP_MAIL_PWD"));
 			m.set_x_request_id(x_request_id);
 			m.set_to(to);
@@ -757,7 +758,7 @@ namespace http
 			}
 			m.send();
 		};
-		thread::launch_async(task);
+		[[maybe_unused]] auto task = std::async(std::launch::async, async_task);
 	}
 
 	std::string_view request::get_body() const noexcept
