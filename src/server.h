@@ -46,8 +46,9 @@
 #include "httputils.h"
 #include "jwt.h"
 #include "email.h"
+#include "http_client.h"
 
-constexpr char SERVER_VERSION[] = "API-Server++ v1.3.8";
+constexpr char SERVER_VERSION[] = "API-Server++ v1.3.9";
 constexpr const char* LOGGER_SRC {"server"};
 
 struct webapi_path
