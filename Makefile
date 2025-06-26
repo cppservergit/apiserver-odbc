@@ -29,6 +29,9 @@ jwt.o: src/jwt.cpp src/jwt.h src/json.h
 util.o: src/util.cpp src/util.h
 	$(CC) $(CC_OPTS) -c src/util.cpp
 
+pkeyutil.o: src/pkeyutil.cpp src/pkeyutil.h
+	$(CC) $(CC_OPTS) -c src/pkeyutil.cpp
+
 logger.o: src/logger.cpp src/logger.h
 	$(CC) $(CC_OPTS) -c src/logger.cpp
 
@@ -36,4 +39,4 @@ env.o: src/env.cpp src/env.h
 	$(CC) $(CC_OPTS) -c src/env.cpp
 
 clean:
-	rm env.o logger.o jwt.o sql.o login.o email.o httputils.o util.o main.o
+	rm -f pkeyutil.o env.o logger.o jwt.o sql.o login.o email.o httputils.o util.o main.o
