@@ -17,6 +17,9 @@ login.o: src/login.cpp src/login.h
 sql.o: src/sql.cpp src/sql.h
 	$(CC) $(CC_OPTS) -c src/sql.cpp
 
+odbcutil.o: src/odbcutil.cpp src/odbcutil.h
+	$(CC) $(CC_OPTS) -c src/odbcutil.cpp
+
 email.o: src/email.cpp src/email.h
 	$(CC) $(CC_OPTS) -c src/email.cpp
 
@@ -39,4 +42,4 @@ env.o: src/env.cpp src/env.h
 	$(CC) $(CC_OPTS) -c src/env.cpp
 
 clean:
-	rm -f pkeyutil.o env.o logger.o jwt.o sql.o login.o email.o httputils.o util.o main.o
+	rm -f  $(CC_OBJS)
