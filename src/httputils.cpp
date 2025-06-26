@@ -759,12 +759,12 @@ namespace http
 			m.send();
 		};
 		[[maybe_unused]] auto task = std::async(std::launch::async, 
-			[to, cc, subject, mail_body, attachment, attachment_filename, x_request_id]() 
+			[to_=std::move(to), cc_=std::move(cc), subject, mail_body, attachment, attachment_filename, x_request_id]() 
 			{
 				smtp::mail m(env::get_str("CPP_MAIL_SERVER"), env::get_str("CPP_MAIL_USER"), env::get_str("CPP_MAIL_PWD"));
 				m.set_x_request_id(x_request_id);
-				m.set_to(to);
-				m.set_cc(cc);
+				m.set_to(to_);
+				m.set_cc(cc_);
 				m.set_subject(subject);
 				m.set_body(mail_body);
 				if (!attachment.empty()) {
