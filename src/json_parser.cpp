@@ -65,7 +65,7 @@ bool json_parser::has_key(std::string_view key) const noexcept {
 
 json_parser json_parser::at(std::string_view key) const {
 	if (!obj_ || !json_object_is_type(obj_, json_type_object))
-        throw std::logic_error("json value is not an object");
+        throw parsing_error("json value is not an object");
     auto* child = json_object_object_get(obj_, std::string(key).c_str());
     if (!child) throw std::out_of_range("json object missing key: " + std::string(key));
     return json_parser{json_object_get(child)};
@@ -73,7 +73,7 @@ json_parser json_parser::at(std::string_view key) const {
 
 json_parser json_parser::at(size_t index) const {
 	if (!obj_ || !json_object_is_type(obj_, json_type_array))
-        throw std::logic_error("json value is not an array");	
+        throw parsing_error("json value is not an array");	
     auto* item = json_object_array_get_idx(obj_, index);
     if (!item) throw std::out_of_range("json array index out of range");
     return json_parser{json_object_get(item)};
