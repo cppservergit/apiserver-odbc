@@ -17,7 +17,7 @@
 
 // --- Global Constants ---
 const char SERVER_VERSION[] = "API-Server++ v1.4.1";
-const char* LOGGER_SRC {"server"};
+const char* const LOGGER_SRC {"server"};
 
 // --- Free Functions (Workers and Helpers) ---
 // Note: This function can now use 'server::audit_trail' because it's public in server.h
@@ -69,12 +69,10 @@ server::webapi::webapi(
 : description{std::move(_description)}, verb{_verb}, rules{std::move(_rules)}, 
   roles{std::move(_roles)}, fn{std::move(_fn)}, is_secure{_is_secure} {}
 
-server::server() 
-: m_signal(get_signalfd()),
-  pod_name(get_pod_name()),
-  server_start_date(std::format("{:%FT%T}", std::chrono::get_tzdb().current_zone()->to_local(std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now())))),
-  _start_init(std::chrono::high_resolution_clock::now())
-{}
+server::server() : m_signal(get_signalfd()), pod_name(get_pod_name())
+{
+	 const std::string server_start_date {std::format("{:%FT%T}", std::chrono::get_tzdb().current_zone()->to_local(std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now())))};
+}
 
 std::string server::get_pod_name() {
     std::array<char, 128> hostname{0};
@@ -137,7 +135,7 @@ void server::save_audit_trail(const audit_trail& at) {
 
 void server::execute_service(http::request& req, const std::shared_ptr<const webapi>& api_ptr) {
     if (!api_ptr) {
-        throw std::runtime_error("execute_service was called with a null API handler pointer.");
+        throw http::resource_not_found_exception("execute_service was called with a null API handler pointer.");
     }
     req.enforce(api_ptr->verb);
     if (!api_ptr->rules.empty()) {

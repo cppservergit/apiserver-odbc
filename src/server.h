@@ -25,7 +25,7 @@
 #include "http_client.h"
 
 extern const char SERVER_VERSION[];
-extern const char* LOGGER_SRC;
+extern const char* const LOGGER_SRC;
 
 // Type aliases for API definitions
 using rules = std::vector<http::input_rule>;
