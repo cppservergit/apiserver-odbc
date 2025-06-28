@@ -71,7 +71,7 @@ server::webapi::webapi(
 
 server::server() : m_signal(get_signalfd()), pod_name(get_pod_name())
 {
-	 const std::string server_start_date {std::format("{:%FT%T}", std::chrono::get_tzdb().current_zone()->to_local(std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now())))};
+	 server_start_date = std::format("{:%FT%T}", std::chrono::get_tzdb().current_zone()->to_local(std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now())));
 }
 
 std::string server::get_pod_name() {

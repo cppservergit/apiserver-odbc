@@ -36,6 +36,10 @@ const curl_global_initializer g_curl_initializer;
 
 } // namespace
 
+
+curl_exception::curl_exception(const std::string& msg)
+    : std::runtime_error(msg) {}
+
 class http_client::impl {
 public:
     explicit impl(http_client_config config) : m_config(std::move(config)) {}
