@@ -16,7 +16,7 @@
 #include <openssl/hmac.h>
 #include "logger.h"
 #include "env.h"
-#include "json.h"
+#include "json_parser.h"
 
 /**
  * @brief Implements JSON Web Token.

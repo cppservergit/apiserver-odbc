@@ -82,7 +82,8 @@ namespace
 	constexpr void parse_json(auto req) 
 	{
 		std::string_view payload {req->get_body()};
-		req->params = json::parse(payload); 
+		json::json_parser p {payload};
+		req->params = p.get_map(); 
 	}
 
 	constexpr std::vector<std::string_view> parse_body(auto req) {
@@ -604,7 +605,7 @@ namespace http
 			} else if (method == "POST" && get_header("content-type").ends_with("/json")) {
 				try {
 					parse_json(this);
-				} catch (const json::invalid_json_exception& e) {
+				} catch (const json::parsing_error& e) {
 					set_parse_error(e.what());
 				}
 			}

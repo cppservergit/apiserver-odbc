@@ -263,17 +263,14 @@ namespace http
 		std::string token;
 		std::string origin{"null"};
 		socket_buffer payload;
-		std::unordered_map<std::string, std::string, util::string_hash, std::equal_to<>> headers;
-		std::unordered_map<std::string, std::string, util::string_hash, std::equal_to<>> params;
+		std::map<std::string, std::string, std::less<>> headers;
+		std::map<std::string, std::string, std::less<>> params;
 		std::vector<input_rule> input_rules;
 		jwt::user_info user_info;
 		response_stream response;
 		
 		explicit request(int epollfd, int fdes, const char* ip): epoll_fd{epollfd}, fd {fdes}, remote_ip {ip}
-		{
-			headers.reserve(10);
-			params.reserve(10);
-		}
+		{ }
 
 		request() = default;
 		void clear();

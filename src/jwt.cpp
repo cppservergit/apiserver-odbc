@@ -110,7 +110,8 @@ namespace
 	
 	jwt::user_info parse_payload(const std::string& payload)
 	{
-		auto fields {json::parse(payload)};
+		json::json_parser p(payload);
+		auto fields {p.get_map()};
 		return jwt::user_info {
 				fields["sid"], 
 				fields["login"], 
