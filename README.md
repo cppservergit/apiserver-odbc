@@ -110,15 +110,21 @@ make
 
 Expected output:
 ```
-g++ -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel -c src/env.cpp
-g++ -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel -c src/logger.cpp
-g++ -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel -c src/jwt.cpp
-g++ -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel -c src/httputils.cpp
-g++ -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel -c src/sql.cpp
-g++ -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel -c src/login.cpp
-g++ -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel -DCPP_BUILD_DATE=20230807 -c src/server.cpp
-g++ -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel -c src/main.cpp
-g++ -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel env.o logger.o jwt.o httputils.o email.o pkeyutil.o odbcutil.o sql.o util.o main.o -lodbc -lcurl -lcrypto -luuid -ljson-c -o "apiserver"
+g++ -Wall -Wextra -O2 -std=c++23 -pthread -flto=4 -march=x86-64 -mtune=intel -c src/env.cpp
+g++ -Wall -Wextra -O2 -std=c++23 -pthread -flto=4 -march=x86-64 -mtune=intel -c src/logger.cpp
+g++ -Wall -Wextra -O2 -std=c++23 -pthread -flto=4 -march=x86-64 -mtune=intel -c src/json_parser.cpp
+g++ -Wall -Wextra -O2 -std=c++23 -pthread -flto=4 -march=x86-64 -mtune=intel -c src/jwt.cpp
+g++ -Wall -Wextra -O2 -std=c++23 -pthread -flto=4 -march=x86-64 -mtune=intel -c src/httputils.cpp
+g++ -Wall -Wextra -O2 -std=c++23 -pthread -flto=4 -march=x86-64 -mtune=intel -c src/email.cpp
+g++ -Wall -Wextra -O2 -std=c++23 -pthread -flto=4 -march=x86-64 -mtune=intel -c src/pkeyutil.cpp
+g++ -Wall -Wextra -O2 -std=c++23 -pthread -flto=4 -march=x86-64 -mtune=intel -c src/odbcutil.cpp
+g++ -Wall -Wextra -O2 -std=c++23 -pthread -flto=4 -march=x86-64 -mtune=intel -c src/http_client.cpp
+g++ -Wall -Wextra -O2 -std=c++23 -pthread -flto=4 -march=x86-64 -mtune=intel -c src/sql.cpp
+g++ -Wall -Wextra -O2 -std=c++23 -pthread -flto=4 -march=x86-64 -mtune=intel -c src/login.cpp
+g++ -Wall -Wextra -O2 -std=c++23 -pthread -flto=4 -march=x86-64 -mtune=intel -DCPP_BUILD_DATE=20250628 -c src/server.cpp
+g++ -Wall -Wextra -O2 -std=c++23 -pthread -flto=4 -march=x86-64 -mtune=intel -c src/util.cpp
+g++ -Wall -Wextra -O2 -std=c++23 -pthread -flto=4 -march=x86-64 -mtune=intel -c src/main.cpp
+g++ -Wall -Wextra -O2 -std=c++23 -pthread -flto=4 -march=x86-64 -mtune=intel env.o logger.o json_parser.o jwt.o httputils.o email.o pkeyutil.o odbcutil.o http_client.o sql.o login.o server.o util.o main.o -lodbc -lcurl -lcrypto -luuid -ljson-c -loath -o "apiserver"
 ```
 
 ## Run API-Server++
@@ -173,28 +179,20 @@ Run API-Server++
 
 Expected output:
 ```
-{"source":"signal","level":"info","msg":"signal interceptor registered","thread":"139909296822784","x-request-id":""}
-{"source":"server","level":"info","msg":"registering built-in diagnostic and security services...","thread":"139909296822784","x-request-id":""}
-{"source":"server","level":"info","msg":"registered (insecure) WebAPI for path: /api/ping","thread":"139909296822784","x-request-id":""}
-{"source":"server","level":"info","msg":"registered (insecure) WebAPI for path: /api/version","thread":"139909296822784","x-request-id":""}
-{"source":"server","level":"info","msg":"registered (insecure) WebAPI for path: /api/sysinfo","thread":"139909296822784","x-request-id":""}
-{"source":"server","level":"info","msg":"registered (insecure) WebAPI for path: /api/metrics","thread":"139909296822784","x-request-id":""}
-{"source":"server","level":"info","msg":"registered (insecure) WebAPI for path: /api/login","thread":"139909296822784","x-request-id":""}
-{"source":"server","level":"info","msg":"registered (insecure) WebAPI for path: /api/docs","thread":"139909296822784","x-request-id":""}
-{"source":"env","level":"info","msg":"port: 8080","thread":"139909296822784","x-request-id":""}
-{"source":"env","level":"info","msg":"pool size: 4","thread":"139909296822784","x-request-id":""}
-{"source":"env","level":"info","msg":"login log: 1","thread":"139909296822784","x-request-id":""}
-{"source":"env","level":"info","msg":"http log: 1","thread":"139909296822784","x-request-id":""}
-{"source":"env","level":"info","msg":"jwt exp: 600","thread":"139909296822784","x-request-id":""}
-{"source":"server","level":"info","msg":"Pod: testvm PID: 2958 starting API-Server++ v1.0.7-20240306","thread":"139909296822784","x-request-id":""}
-{"source":"server","level":"info","msg":"hardware threads: 4 GCC: 13.2.0","thread":"139909296822784","x-request-id":""}
-{"source":"pool","level":"info","msg":"starting worker thread","thread":"139909283182272","x-request-id":""}
-{"source":"pool","level":"info","msg":"starting worker thread","thread":"139909274789568","x-request-id":""}
-{"source":"pool","level":"info","msg":"starting worker thread","thread":"139909266396864","x-request-id":""}
-{"source":"pool","level":"info","msg":"starting worker thread","thread":"139909258004160","x-request-id":""}
-{"source":"server","level":"info","msg":"server started in 0.000355605s","thread":"139909296822784","x-request-id":""}
-{"source":"epoll","level":"info","msg":"starting epoll FD: 4","thread":"139909296822784","x-request-id":""}
-{"source":"epoll","level":"info","msg":"listen socket FD: 5 port: 8080","thread":"139909296822784","x-request-id":""}
+{"source":"signal","level":"info","msg":"signal interceptor registered","thread":"137086411119680","x-request-id":""}
+{"source":"server","level":"info","msg":"registering built-in diagnostic and security services...","thread":"137086411119680","x-request-id":""}
+{"source":"env","level":"info","msg":"port: 8080","thread":"137086411119680","x-request-id":""}
+{"source":"env","level":"info","msg":"pool size: 4","thread":"137086411119680","x-request-id":""}
+{"source":"env","level":"info","msg":"login log: 1","thread":"137086411119680","x-request-id":""}
+{"source":"env","level":"info","msg":"http log: 1","thread":"137086411119680","x-request-id":""}
+{"source":"env","level":"info","msg":"jwt exp: 600","thread":"137086411119680","x-request-id":""}
+{"source":"env","level":"info","msg":"enable audit: 1","thread":"137086411119680","x-request-id":""}
+{"source":"server","level":"info","msg":"Pod: test PID: 39760 starting API-Server++ v1.4.1-20250628","thread":"137086411119680","x-request-id":""}
+{"source":"server","level":"info","msg":"hardware threads: 2 GCC: 13.3.0","thread":"137086411119680","x-request-id":""}
+{"source":"server","level":"info","msg":"server started in 1751164609.2078166s","thread":"137086411119680","x-request-id":""}
+{"source":"epoll","level":"info","msg":"starting epoll FD: 4","thread":"137086411119680","x-request-id":""}
+{"source":"pool","level":"info","msg":"starting audit thread","thread":"137086377035456","x-request-id":""}
+{"source":"epoll","level":"info","msg":"listen non-blocking socket FD: 5 port: 8080","thread":"137086411119680","x-request-id":""}
 ```
 
 ## Test connection to API-Server++
@@ -230,16 +228,11 @@ curl --json '{"username":"mcordova", "password":"basica"}' localhost:8080/api/lo
 
 On the same terminal where API-Server++ is running press CTRL-C to stop the server, you should see some messages like these on the console:
 ```
-{"source":"signal","level":"info","msg":"stop signal received via epoll","thread":"140693621230080","x-request-id":""}
-{"source":"epoll","level":"info","msg":"closing listen socket FD: 5","thread":"140693621230080","x-request-id":""}
-{"source":"epoll","level":"info","msg":"closing epoll FD: 4","thread":"140693621230080","x-request-id":""}
-{"source":"server","level":"info","msg":"testvm shutting down...","thread":"140693621230080","x-request-id":""}
-{"source":"pool","level":"info","msg":"stopping worker thread","thread":"140693607544512","x-request-id":""}
-{"source":"pool","level":"info","msg":"stopping worker thread","thread":"140693456541376","x-request-id":""}
-{"source":"pool","level":"info","msg":"stopping worker thread","thread":"140693599151808","x-request-id":""}
-{"source":"pool","level":"info","msg":"stopping worker thread","thread":"140693590759104","x-request-id":""}
-{"source":"odbcutil","level":"debug","msg":"closing ODBC connection 0x7ff5b4000de0 CPP_LOGINDB","thread":"140693590759104","x-request-id":""}
-{"source":"odbcutil","level":"debug","msg":"closing ODBC connection 0x7ff5c0000e40 CPP_LOGINDB","thread":"140693607544512","x-request-id":""}
+{"source":"signal","level":"info","msg":"stop signal received via epoll","thread":"137086411119680","x-request-id":""}
+{"source":"epoll","level":"info","msg":"closing listen socket FD: 5","thread":"137086411119680","x-request-id":""}
+{"source":"epoll","level":"info","msg":"closing epoll FD: 4","thread":"137086411119680","x-request-id":""}
+{"source":"server","level":"info","msg":"test shutting down...","thread":"137086411119680","x-request-id":""}
+{"source":"pool","level":"info","msg":"stopping audit thread","thread":"137086377035456","x-request-id":""}
 ```
 All resources were released, including ODBC resources. API-Server++ intercepts Linux signals, it can be stopped via CTRL-C or SystemD-triggered signals, container orchestrators like Kubernetes also use these signals to kill Pods (a running container).
 
@@ -257,8 +250,8 @@ Add this code below `server s;` and right above `s.start();`:
 		webapi_path("/api/shippers/view"), 
 		"List of shipping companies",
 		http::verb::GET, 
-		{} /* inputs */, 	
-		{} /* roles */,
+		rules {}, 	
+		roles {},
 		[](http::request& req) 
 		{
 			req.response.set_body(sql::get_json_response("DB1", "sp_shippers_view"));
@@ -298,8 +291,8 @@ int main()
 		webapi_path("/api/shippers/view"), 
 		"List of shipping companies",
 		http::verb::GET, 
-		{} /* inputs */, 	
-		{} /* roles */,
+		rules {}, 	
+		roles {},
 		[](http::request& req) 
 		{
 			req.response.set_body(sql::get_json_response("DB1", "sp_shippers_view"));
@@ -317,8 +310,8 @@ make
 
 Expected output:
 ```
-g++ -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=native -mtune=intel -DCPP_BUILD_DATE=20240306 -c src/main.cpp
-g++ -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=native -mtune=intel env.o logger.o jwt.o httputils.o email.o pkeyutil.o odbcutil.o sql.o util.o main.o -lodbc -lcurl -lcrypto -luuid -ljson-c -o "apiserver"
+g++ -Wall -Wextra -O2 -std=c++23 -pthread -flto=4 -march=x86-64 -mtune=intel -c src/main.cpp
+g++ -Wall -Wextra -O2 -std=c++23 -pthread -flto=4 -march=x86-64 -mtune=intel env.o logger.o json_parser.o jwt.o httputils.o email.o pkeyutil.o odbcutil.o http_client.o sql.o login.o server.o util.o main.o -lodbc -lcurl -lcrypto -luuid -ljson-c -loath -o "apiserver"
 ```
 
 Now run the server again:
@@ -391,10 +384,7 @@ Expected output:
 }
 ```
 
-The token gets validated by API-Server++ before executing your lambda, it has a default duration of 10 minutes and it can be configured via environment variable, in a Kubernetes-friendly way, in any case, authentication and authorization are transparent to your API and always enforced. All registered APIs are secure by default unless explicitly disabled, in this case, a clear message will be recorded in the logs when registering the API:
-```
-{"source":"server","level":"info","msg":"registered (insecure) WebAPI for path: /api/ping"}
-```
+The token gets validated by API-Server++ before executing your lambda, it has a default duration of 10 minutes and it can be configured via environment variable, in a Kubernetes-friendly way, in any case, authentication and authorization are transparent to your API and always enforced. All registered APIs are secure by default unless explicitly disabled.
 
 ### Testing with Javascript in the browser console
 
@@ -406,7 +396,7 @@ http://testvm.mshome.net:8080/api/sysinfo
 
 Expected output on the browser page:
 ```
-{"status": "OK", "data":[{"pod":"test","totalRequests":69,"avgTimePerRequest":0.00050976,"connections":2,"activeThreads":1}]}
+{"status":"OK","data":[{"pod":"test","startDate":"","totalRequests":0,"avgTimePerRequest":0.000000,"connections":1,"activeThreads":0,"poolSize":4,"totalRam":4009344,"memoryUsage":13056}]}
 ```
 
 There is another built-in API to serve metrics in a Grafana Prometheus-compatible format:
@@ -589,10 +579,10 @@ Add this code right above s.start()
 		webapi_path("/api/customer/info"), 
 		"Retrieve a customer main record and its related orders",
 		http::verb::GET, 
-		{ /* inputs */
+		rules { 
 			{"customerid", http::field_type::STRING, true}
 		}, 	
-		{} /* roles */,
+		roles {},
 		[](http::request& req)
 		{
 			auto sql {req.get_sql("sp_customer_get $customerid")};
@@ -618,8 +608,8 @@ int main()
                 webapi_path("/api/shippers/view"),
                 "List of shipping companies",
                 http::verb::GET,
-                {} /* inputs */,
-                {} /* roles */,
+                rules {},
+                roles {},
                 [](http::request& req)
                 {
                         req.response.set_body(sql::get_json_response("DB1", "sp_shipper_view"));
@@ -631,10 +621,10 @@ int main()
 		webapi_path("/api/customer/info"), 
 		"Retrieve a customer main record and its related orders",
 		http::verb::GET, 
-		{ /* inputs */
+		rules {
 			{"customerid", http::field_type::STRING, true}
 		}, 	
-		{} /* roles */,
+		roles {},
 		[](http::request& req)
 		{
 			auto sql {req.get_sql("sp_customer_get $customerid")};
@@ -653,20 +643,13 @@ make
 
 Expected output:
 ```
-g++ -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=x86-64 -mtune=intel -c src/main.cpp
-g++ -Wall -Wextra -O3 -std=c++23 -pthread -flto=4 -fno-extern-tls-init -march=native -mtune=intel env.o logger.o jwt.o httputils.o email.o pkeyutil.o odbcutil.o sql.o util.o main.o -lodbc -lcurl -lcrypto -luuid -ljson-c -o "apiserver"
+g++ -Wall -Wextra -O2 -std=c++23 -pthread -flto=4 -march=x86-64 -mtune=intel -c src/main.cpp
+g++ -Wall -Wextra -O2 -std=c++23 -pthread -flto=4 -march=x86-64 -mtune=intel env.o logger.o json_parser.o jwt.o httputils.o email.o pkeyutil.o odbcutil.o http_client.o sql.o login.o server.o util.o main.o -lodbc -lcurl -lcrypto -luuid -ljson-c -loath -o "apiserver"
 ```
 
 Run the new version:
 ```
 ./run
-```
-
-The program log should contain these lines at the beginning:
-```
-{"source":"signal","level":"info","msg":"signal interceptor registered"}
-{"source":"server","level":"info","msg":"registered WebAPI for path: /api/shippers/view"}
-{"source":"server","level":"info","msg":"registered WebAPI for path: /api/customer/info"}
 ```
 
 You new API has been registered and is ready for testing, you can use your HTML page, test.html, just add these lines to the tester code:
