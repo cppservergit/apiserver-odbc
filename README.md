@@ -204,7 +204,41 @@ curl localhost:8080/api/version
 
 Expected output:
 ```
-{"status": "OK", "data":[{"pod": "test", "server": "API-Server++ v1.0.7-20240306"}]}
+{
+  "status": "OK",
+  "data": [
+    {
+      "pod": "test",
+      "server": "API-Server++ v1.4.1-20250629",
+      "compiler": "13.3.0"
+    }
+  ]
+}
+```
+
+Now run:
+```
+curl localhost:8080/api/sysinfo
+```
+
+Expected output:
+```
+{
+  "status": "OK",
+  "data": [
+    {
+      "pod": "test",
+      "startDate": "2025-06-29T15:15:02",
+      "totalRequests": 0,
+      "avgTimePerRequest": 0.000000,
+      "connections": 1,
+      "activeThreads": 0,
+      "poolSize": 4,
+      "totalRam": 4009344,
+      "memoryUsage": 12928
+    }
+  ]
+}
 ```
 
 ## Test login API and JWT
