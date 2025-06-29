@@ -69,9 +69,9 @@ server::webapi::webapi(
 : description{std::move(_description)}, verb{_verb}, rules{std::move(_rules)}, 
   roles{std::move(_roles)}, fn{std::move(_fn)}, is_secure{_is_secure} {}
 
-server::server() : m_signal(get_signalfd()), pod_name(get_pod_name())
+server::server() : m_signal(get_signalfd()), pod_name(get_pod_name()),
+	server_start_date(std::format("{:%FT%T}", std::chrono::get_tzdb().current_zone()->to_local(std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now()))))
 {
-	 server_start_date = std::format("{:%FT%T}", std::chrono::get_tzdb().current_zone()->to_local(std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now())));
 }
 
 std::string server::get_pod_name() {
