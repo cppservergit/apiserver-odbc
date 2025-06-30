@@ -24,25 +24,39 @@ int main()
 }
 ```
 
-This is the declaration of the utility function used to register an API with all its features (a simplified version was used above):
+This is the declaration of the utility function used to register an API with all its features (a simplified version was used above). Safety and efficiency were a priority when creating this code:
 ```
-	void register_webapi(
-		const webapi_path& _path, 
-		const std::string& _description, 
-		http::verb _verb, 
-		const std::vector<http::input_rule>& _rules, 
-		const std::vector<std::string>& _roles, 
-		std::function<void(http::request&)> _fn,
-		bool _is_secure = true
-	);
+    // Overload 1: For calls that specify rules and roles
+    template<typename DescType, typename RulesType, typename RolesType, typename FnType>
+    void register_webapi(
+        const webapi_path& _path,
+        DescType&& _description,
+        const http::verb& _verb,
+        RulesType&& _rules,
+        RolesType&& _roles,
+        FnType&& _fn,
+        const bool _is_secure = true)
+    {
+        webapi_catalog.try_emplace(
+            _path.get(),
+            std::make_shared<const webapi>(
+                std::forward<DescType>(_description),
+                _verb,
+                std::forward<RulesType>(_rules),
+                std::forward<RolesType>(_roles),
+                std::forward<FnType>(_fn),
+                _is_secure
+            )
+        );
+    }
 ```
-You can specify input rules (input parameters, optional), authorized roles (optional), and your lambda function, which will usually be very simple, but it can also incorporate additional validations. All this metadata will be used to auto-generate API documentation.
+You can specify input rules (input parameters, optional), authorized roles (optional), and your lambda function, which will usually be very simple, but it can also incorporate additional validations.
 
-API-Server++ is a compact single-threaded EPOLL HTTP 1.1 microserver for Linux, for serving API requests only (GET/POST/OPTIONS), when a request arrives, the corresponding lambda will be dispatched for execution to a background thread, using the one-producer/many-consumers model. This way API-Server++ can multiplex thousands of concurrent connections with a single thread dispatching all the network-related tasks. API-Server++ is an async, non-blocking, event-oriented server, async because of the way the tasks are dispatched, it returns immediately to keep processing network events, while a background thread picks the task and executes it. The kernel will notify the program when there are events to process, in which case, non-blocking operations will be used on the sockets, and the program won't consume CPU while waiting for events, this way a single-threaded server can serve thousands of concurrent clients if the I/O tasks are fast. The size of the workers' thread pool can be configured via environment variable, the default is 4, which has proved to be good enough for high loads on VMs with 4-6 virtual cores.
+API-Server++ is a compact single-threaded EPOLL HTTP 1.1 microserver for Linux, serving API requests only (GET/POST/OPTIONS). When a request arrives, the corresponding lambda will be dispatched for execution to a background thread, using the one-producer/many-consumers model. This way, API-Server++ can multiplex thousands of concurrent connections with a single thread, dispatching all the network-related tasks. API-Server++ is an async, non-blocking, event-oriented server; it returns immediately to keep processing network events, while a background thread picks the task and executes it. The kernel will notify the program when there are events to process, in which case, non-blocking operations will be used on the sockets, and the program will consume very few CPU resources while waiting for events. This way, a single-threaded server can serve thousands of concurrent clients if the I/O tasks are fast. The size of the workers' thread pool can be configured via an environment variable; the default is 4, which has proved to be good enough for high loads on VMs with 4-6 virtual cores.
 
 API-Server++ was designed to be run as a container on Kubernetes or as a native Linux container (LXD), with a stateless security/session model based on JSON web token (good for scalability), and built-in observability features for Grafana stack, for agile development purpose it can be run as a regular program on a terminal for development or as a SystemD Linux service for production, tightly integrated with native Linux log facilities, on production it will run behind an Ingress or Load Balancer providing TLS and Layer-7 protection.
 
-It uses direct calls to the ODBC C API for maximum speed, `libcurl` for secure email, and `openssl v3` for JWT signatures. It expects a JSON response from queries returning data, which is very easy to do with stored procedures in most modern databases.
+It makes direct calls to the ODBC C API for maximum speed, `libcurl` for HTTP client API and secure email, and `openssl v3` for JWT signatures and encryption. It expects a JSON response from queries returning data, which is very easy to do with stored procedures in most modern databases, and also supports SPs that return resultsets, assembling the JSON response in-memory for these cases.
 
 ![image](https://github.com/cppservergit/apiserver-odbc/assets/126841556/ab9c74b9-097f-4899-a564-b46d3cc931c1)
 
