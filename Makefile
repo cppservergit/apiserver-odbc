@@ -1,12 +1,20 @@
-SHELL=bash
-DATE=$(shell printf '%(%Y%m%d)T')
-CC=g++
-CC_OPTS=-Wall -Wextra -O2 -std=c++23 -pthread -flto=4 -march=x86-64 -mtune=intel
-CC_LIBS=-lodbc -lcurl -lcrypto -luuid -ljson-c -loath
-CC_OBJS=env.o logger.o json_parser.o jwt.o httputils.o email.o pkeyutil.o odbcutil.o http_client.o sql.o login.o server.o util.o main.o
+# Makefile with screen clearing and modular structure
+SHELL = bash
+DATE = $(shell printf '%(%Y%m%d)T')
+CC = g++
+CC_OPTS = -Wall -Wextra -O2 -std=c++23 -pthread -flto=4 -march=x86-64 -mtune=intel
+CC_LIBS = -lodbc -lcurl -lcrypto -luuid -ljson-c -loath
+CC_OBJS = env.o logger.o json_parser.o jwt.o httputils.o email.o pkeyutil.o odbcutil.o http_client.o sql.o login.o server.o util.o main.o
+
+.PHONY: all clean clear_screen
+
+all: clear_screen apiserver
+
+clear_screen:
+	@clear
 
 apiserver: $(CC_OBJS)
-	$(CC) $(CC_OPTS) $(CC_OBJS) $(CC_LIBS) -o "apiserver"
+	$(CC) $(CC_OPTS) $(CC_OBJS) $(CC_LIBS) -o apiserver
 
 main.o: src/main.cpp
 	$(CC) $(CC_OPTS) -c src/main.cpp
@@ -51,4 +59,4 @@ env.o: src/env.cpp src/env.h
 	$(CC) $(CC_OPTS) -c src/env.cpp
 
 clean:
-	rm -f  $(CC_OBJS)
+	rm -f $(CC_OBJS) apiserver
