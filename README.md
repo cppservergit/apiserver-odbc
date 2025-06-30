@@ -719,14 +719,14 @@ The DemoDB database contains many stored procedures that return JSON and can be 
 	(
 		webapi_path("/api/gasto/add"), 
 		"Add expenses record",
-		http::verb::POST, 
+		rules http::verb::POST, 
 		{
 			{"fecha", http::field_type::DATE, true},
 			{"categ_id", http::field_type::INTEGER, true},
 			{"monto", http::field_type::DOUBLE, true},
 			{"motivo", http::field_type::STRING, true}			
 		},
-		{},
+		roles {},
 		[](http::request& req) 
 		{
 			auto sql {req.get_sql("sp_gasto_insert $fecha, $categ_id, $monto, $motivo")};
@@ -743,7 +743,7 @@ The case for using a procedure that updates a record is very similar, but in thi
 	(
 		webapi_path("/api/gasto/update"), 
 		"Update expense record",
-		http::verb::POST, 
+		rules http::verb::POST, 
 		{
 			{"gasto_id", http::field_type::INTEGER, true},
 			{"fecha", http::field_type::DATE, true},
@@ -752,7 +752,7 @@ The case for using a procedure that updates a record is very similar, but in thi
 			{"motivo", http::field_type::STRING, true}			
 		},
 		{"can_update"},
-		[](http::request& req) 
+		roles [](http::request& req) 
 		{
 			auto sql {req.get_sql("sp_gasto_update $gasto_id, $fecha, $categ_id, $monto, $motivo")};
 			sql::exec_sql("DB1", sql);
@@ -794,12 +794,12 @@ This API executes a stored procedure that returns a JSON response to fill a sale
 	(
 		webapi_path("/api/sales/query"), 
 		"Sales report by category in a time interval",
-		http::verb::POST, 
+		rules http::verb::POST, 
 		{
 			{"date1", http::field_type::DATE, true},
 			{"date2", http::field_type::DATE, true}
 		},
-		{"report", "sysadmin"},
+		roles {"report", "sysadmin"},
 		[](http::request& req) 
 		{
 			auto sql {req.get_sql("sp_sales_by_category $date1, $date2")};
@@ -886,8 +886,8 @@ This API will invoke a stored procedure to delete a record, but instead of waiti
 		webapi_path("/api/categ/delete"), 
 		"Delete category record",
 		http::verb::GET, 
-		{{"id", http::field_type::INTEGER, true}},
-		{"can_delete"},
+		rules {{"id", http::field_type::INTEGER, true}},
+		roles {"can_delete"},
 		[](http::request& req) 
 		{
 			//validator for referential integrity
@@ -931,14 +931,14 @@ Example of simple invocation without CC and no attachment:
 	(
 		webapi_path("/api/gasto/add"), 
 		"Add expense record",
-		http::verb::POST, 
+		rules http::verb::POST, 
 		{
 			{"fecha", http::field_type::DATE, true},
 			{"categ_id", http::field_type::INTEGER, true},
 			{"monto", http::field_type::DOUBLE, true},
 			{"motivo", http::field_type::STRING, true}			
 		},
-		{},
+		roles {},
 		[](http::request& req) 
 		{
 			sql::exec_sql("DB1", req.get_sql("sp_gasto_insert $fecha, $categ_id, $monto, $motivo"));
@@ -1009,20 +1009,7 @@ API-Server++ has been tested for data races with `-fsanitizer=thread` while rece
 
 ## Memory safety
 
-API-Sever++ has been tested for memory safety (leaks and overflows) with dynamic analysis instrumentation tools including Valgrind and GCC memory sanitizer (-fsanitize=leak and -fsanitize=address), It has passed all tests, with no leaks or warning of any sort when running a load of 2000 concurrent connections executing a variety of API requests involving database operations as well as diagnostics.
-
-Valgrind report (GCC sanitizers only print if problems are found):
-
-```
-==3412== HEAP SUMMARY:
-==3412==     in use at exit: 0 bytes in 0 blocks
-==3412==   total heap usage: 4,423,921 allocs, 4,423,921 frees, 1,453,005,010 bytes allocated
-==3412==
-==3412== All heap blocks were freed -- no leaks are possible
-==3412==
-==3412== For lists of detected and suppressed errors, rerun with: -s
-==3412== ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)
-```
+API-Sever++ has been tested for memory safety (leaks and overflows) with dynamic analysis instrumentation tools including Valgrind and GCC memory sanitizer (-fsanitize=leak, -fsanitize=address, -f=undefined), It has passed all tests, with no leaks or warning of any sort when running a load of 2000 concurrent connections executing a variety of API requests involving database operations as well as diagnostics.
 
 API-Server++ is a small program, code coverage is pretty complete with these tests, and most probable code paths, if not all, are executed.
 Please note that in order to use dynamic analysis tools you need to compile with `-g` and `-O0`.
@@ -1033,7 +1020,7 @@ SonarCloud is the top player in C++ static analysis, performing rigorous analysi
 
 ![image](https://github.com/cppservergit/apiserver/assets/126841556/8422507e-f30a-44dd-8539-1c6af62402b1)
 
-We managed to fix all issues reported and the current code base has achieved a perfect score for all the code, no issues of any kind were detected.
+We managed to fix all issues reported by Sonar, which is a very strict scanner tool, and the current code base has achieved a perfect score for all the code; no issues of any kind were detected, except for a few false positives that were documented.
 
 ## Implementing the security backend in SQL Server
 
