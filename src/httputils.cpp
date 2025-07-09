@@ -738,7 +738,7 @@ namespace http
 		logger::log(source, level, replace_params(this, msg), get_header("x-request-id"));
 	}
 
-	void request::send_mail(std::string& to, std::string& subject, std::string& body)
+	void request::send_mail(const std::string& to, std::string& subject, const std::string& body)
 	{
 		std::string cc;
 		std::string att;
@@ -746,14 +746,14 @@ namespace http
 		send_mail(to, cc, subject, body, att, attfn);
 	}
 
-	void request::send_mail(std::string& to, std::string& cc, std::string& subject, std::string& body)
+	void request::send_mail(const std::string& to, std::string& cc, std::string& subject, const std::string& body)
 	{
 		std::string att;
 		std::string attfn;
 		send_mail(to, cc, subject, body, att, attfn);
 	}
 
-	void request::send_mail(std::string& to, std::string& cc, std::string& subject, std::string& body, 
+	void request::send_mail(const std::string& to, std::string& cc, std::string& subject, const std::string& body, 
 		std::string& attachment, std::string& attachment_filename)
 	{
 		auto mail_to = to;

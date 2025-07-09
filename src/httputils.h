@@ -319,9 +319,9 @@ namespace http
 		void check_security(const std::vector<std::string>& roles = {});
 		void log(std::string_view source, std::string_view level, const std::string& msg) noexcept;
 		
-		void send_mail(std::string& to, std::string& subject, std::string& body);
-		void send_mail(std::string& to, std::string& cc, std::string& subject, std::string& body);
-		void send_mail(std::string& to, std::string& cc, std::string& subject, std::string& body, std::string& attachment, std::string& attachment_filename);
+		void send_mail(const std::string& to, std::string& subject, const std::string& body);
+		void send_mail(const std::string& to, std::string& cc, std::string& subject, const std::string& body);
+		void send_mail(const std::string& to, std::string& cc, std::string& subject, const std::string& body, std::string& attachment, std::string& attachment_filename);
 		
 		std::string_view get_body() const noexcept;
 

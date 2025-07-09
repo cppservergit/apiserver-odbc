@@ -24,22 +24,21 @@ namespace {
 		return ec.message();
 	}
 	
-	std::string get_peer_ip_ipv4(int sockfd) 
-	{
-		// Use sockaddr_in directly as we only expect IPv4
+	std::string get_peer_ip_ipv4(int sockfd) {
 		sockaddr_in addr{};
-		socklen_t addr_len = sizeof(addr);
 
-		if (getpeername(sockfd, reinterpret_cast<sockaddr*>(&addr), &addr_len) == 0) {
+		if (socklen_t addr_len = sizeof(addr);
+			getpeername(sockfd, static_cast<sockaddr*>(static_cast<void*>(&addr)), &addr_len) == 0) 
+		{
 			std::array<char, INET_ADDRSTRLEN> buffer{};
-			// Convert the binary IPv4 address to a string
 			if (inet_ntop(AF_INET, &addr.sin_addr, buffer.data(), buffer.size())) {
 				return std::string{buffer.data()};
 			}
 		}
-		// Return an empty string on failure
 		return "";
 	}
+
+
 	
 	std::string_view trim_whitespace(std::string_view str) 
 	{
@@ -51,16 +50,16 @@ namespace {
 		return str.substr(first, (last - first + 1));
 	}	
 	
-	std::unordered_set<std::string> parse_allowed_origins(std::string_view origins_str) 
+	std::unordered_set<std::string, util::string_hash, std::equal_to<>> parse_allowed_origins(std::string_view origins_str) 
 	{
-		std::unordered_set<std::string> allowed_origins;
+		std::unordered_set<std::string, util::string_hash, std::equal_to<>> allowed_origins;
 
 		for (const auto& range : origins_str | std::views::split(',')) {
 			// The view needs to be converted to a string_view to be trimmed
-			std::string_view token_view(&*range.begin(), std::ranges::distance(range));
+			std::string_view token_view(range.begin(), std::ranges::distance(range));
 			std::string_view trimmed_origin = trim_whitespace(token_view);
 			if (!trimmed_origin.empty()) {
-				allowed_origins.insert(std::string(trimmed_origin));
+				allowed_origins.emplace(trimmed_origin);
 			}
 		}
 		return allowed_origins;
@@ -68,8 +67,7 @@ namespace {
 	
 	std::string get_signal_name(int fd) {
 		signalfd_siginfo info {};
-		ssize_t bytesRead = read(fd, &info, sizeof(info));
-		if (bytesRead != sizeof(info)) {
+		if (ssize_t bytesRead = read(fd, &info, sizeof(info)); bytesRead != sizeof(info)) {
 			return "read_error";
 		}
 
@@ -82,18 +80,19 @@ namespace {
 	}
 	
 	inline int get_fd(const epoll_event& ev) {
-		return static_cast<int>(ev.data.fd);
+		return ev.data.fd;
 	}
 	
 	constexpr std::string_view get_reason_phrase(http::status s) {
+		using enum http::status;
 			switch (s) {
-				case http::status::ok:                  return "OK";
-				case http::status::no_content:          return "No Content";
-				case http::status::bad_request:         return "Bad Request";
-				case http::status::unauthorized:        return "Unauthorized";
-				case http::status::forbidden:           return "Forbidden";
-				case http::status::not_found:           return "Not Found";
-				case http::status::method_not_allowed:  return "Method Not Allowed";
+				case ok:                  return "OK";
+				case no_content:          return "No Content";
+				case bad_request:         return "Bad Request";
+				case unauthorized:        return "Unauthorized";
+				case forbidden:           return "Forbidden";
+				case not_found:           return "Not Found";
+				case method_not_allowed:  return "Method Not Allowed";
 				// Add other status codes used in your application here.
 				default:                                return "Internal Server Error";
 			}
@@ -218,7 +217,7 @@ void server::send_error(http::request& req, const http::status status, std::stri
     if (status == http::status::bad_request) {
         logger::log(LOGGER_SRC, "error", 
             std::format("HTTP status: {} IP: {} {} description: Bad request - {}", 
-                        static_cast<int>(status), req.remote_ip, req.path, req.internals.errmsg), 
+                        std::to_underlying(status), req.remote_ip, req.path, req.internals.errmsg), 
             req.get_header("x-request-id"));
     }
 
@@ -229,8 +228,7 @@ void server::send_error(http::request& req, const http::status status, std::stri
 
     // Conditionally generate CORS headers if the origin is allowed.
     std::string cors_headers;
-    const std::string origin = req.get_header("origin");
-    if (is_origin_allowed(origin)) {
+    if (const std::string origin = req.get_header("origin"); is_origin_allowed(origin)) {
         cors_headers = std::format(
             "Access-Control-Allow-Origin: {}\r\n"
             "Vary: Origin\r\n",
@@ -240,11 +238,11 @@ void server::send_error(http::request& req, const http::status status, std::stri
     
     // Define the response template as a constant for clarity and efficiency.
     constexpr std::string_view RESPONSE_TEMPLATE =
-        "HTTP/1.1 {0} {1}\r\n"
-        "Content-Length: {2}\r\n"
+        "HTTP/1.1 {} {}\r\n"
+        "Content-Length: {}\r\n"
         "Content-Type: text/plain; charset=utf-8\r\n"
-        "Date: {3:%a, %d %b %Y %H:%M:%S GMT}\r\n"
-        "{4}" // Conditional CORS headers
+        "Date: {:%a, %d %b %Y %H:%M:%S GMT}\r\n"
+        "{}" // Conditional CORS headers
         "Strict-Transport-Security: max-age=31536000; includeSubDomains; preload\r\n"
         "X-Frame-Options: SAMEORIGIN\r\n"
         "X-Content-Type-Options: nosniff\r\n"
@@ -252,12 +250,12 @@ void server::send_error(http::request& req, const http::status status, std::stri
         "Cache-Control: no-store\r\n"
         "Connection: close\r\n"
         "\r\n"
-        "{5}"; // Response body
+        "{}"; // Response body
 
     // Build the final response string using std::format.
     const auto response_str = std::format(
         RESPONSE_TEMPLATE,
-        static_cast<int>(status),       // {0}: Status code (e.g., 404)
+        std::to_underlying(status),       // {0}: Status code (e.g., 404)
         get_reason_phrase(status),      // {1}: Reason phrase (e.g., "Not Found")
         body.length(),                  // {2}: Length of the response body
         std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now()), // {3}: Current GMT date
@@ -269,7 +267,7 @@ void server::send_error(http::request& req, const http::status status, std::stri
     req.response << response_str;
 }
 
-void server::save_audit_trail(const audit_trail& at) {
+void server::save_audit_trail(audit_trail& at) {
     std::scoped_lock lock{m_audit_mutex};
     m_audit_queue.push(std::move(at));
     m_audit_cond.notify_one();

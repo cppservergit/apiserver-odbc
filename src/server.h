@@ -202,7 +202,7 @@ private:
     // --- Private Methods ---
     void send_options(http::request& req);
     void send_error(http::request& req, http::status status, std::string_view msg);
-    void save_audit_trail(const audit_trail& at);
+    void save_audit_trail(audit_trail& at);
     void execute_service(http::request& req, const std::shared_ptr<const webapi>& api_ptr);
     void process_request(http::request& req, const std::shared_ptr<const webapi>& api_ptr) ;
     void log_request(const http::request& req, double duration) ;
@@ -258,7 +258,7 @@ private:
     const std::string server_start_date;
     bool enable_audit {false};
     
-	const std::unordered_set<std::string> ALLOWED_ORIGINS;
+	const std::unordered_set<std::string, util::string_hash, std::equal_to<>> ALLOWED_ORIGINS;
 	
 	//thread pool and shutdown support
 	std::vector<std::stop_source> m_stops;
