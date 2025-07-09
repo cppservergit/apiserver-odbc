@@ -2,8 +2,6 @@
 
 namespace 
 {
-	//using namespace sql::detail;
-	
 	constexpr int max_retries {10};
 
 	struct col_info {

@@ -18,6 +18,35 @@
 #include <expected>
 
 namespace {
+	std::string get_pod_name() 
+	{
+		long host_name_max = sysconf(_SC_HOST_NAME_MAX);
+		if (host_name_max <= 0) 
+			host_name_max = HOST_NAME_MAX;
+		
+		std::string hostname(host_name_max, '\0');
+
+		if (gethostname(hostname.data(), hostname.size()) != 0)
+			return "hostname not available";
+
+		hostname.resize(std::strlen(hostname.data()));
+		
+		return hostname;	
+	}
+	
+	std::string get_socket_error(const int& fd) {
+		int error = 0;
+
+		if (socklen_t errlen = sizeof(error);
+			getsockopt(fd, SOL_SOCKET, SO_ERROR, &error, &errlen) == 0 && error != 0) 
+		{
+			std::error_code ec(error, std::system_category());
+			return ec.message();
+		}
+
+		return "`no error message available";
+	}
+	
 	std::string str_error_cpp(int err_num) 
 	{
 		std::error_code ec(err_num, std::system_category());
@@ -157,22 +186,6 @@ server::server() : 	m_signal{get_signalfd()},
 					server_start_date{util::current_timestamp()},
 					ALLOWED_ORIGINS{parse_allowed_origins(env::get_str("CPP_ALLOW_ORIGINS"))}
 { }
-
-std::string server::get_pod_name() 
-{
-	long host_name_max = sysconf(_SC_HOST_NAME_MAX);
-    if (host_name_max <= 0) 
-        host_name_max = HOST_NAME_MAX;
-	
-    std::string hostname(host_name_max, '\0');
-
-    if (gethostname(hostname.data(), hostname.size()) != 0)
-        return "hostname not available";
-
-    hostname.resize(std::strlen(hostname.data()));
-    
-    return hostname;	
-}
 
 bool server::is_origin_allowed(const std::string& origin) {
     if (origin.empty()) {
@@ -341,16 +354,16 @@ void server::log_request(const http::request& req, double duration)  {
 }
 
 void server::http_server(http::request& req, const std::shared_ptr<const webapi>& api_ptr)  {
-    ++g_active_threads;
+    ++m_metrics.active_threads;
     auto start = std::chrono::high_resolution_clock::now();
     process_request(req, api_ptr);
     auto finish = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = finish - start;
     if (env::http_log_enabled())
         log_request(req, elapsed.count());
-    g_total_time += elapsed.count();
-    ++g_counter;
-    --g_active_threads;
+    m_metrics.total_processing_time += elapsed.count();
+    ++m_metrics.requests_total;
+    --m_metrics.active_threads;
 }
 
 bool server::read_request(http::request& req, int bytes)  {
@@ -379,17 +392,25 @@ int server::get_signalfd() {
 
 int server::get_listenfd(int port) {
     int fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (fd == -1) {
+        throw server_startup_exception("socket() failed");
+    }
+
     int on = 1;
     setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
     fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK);
-    struct sockaddr_in addr{};
+
+    sockaddr_in addr{};
     addr.sin_port = htons(port);
     addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = htons(INADDR_ANY);
-    if (bind(fd, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr)) == -1) {
-		auto error_msg = std::format("bind() failed  port: {} description: {}", port, str_error_cpp(errno));
-		throw server_startup_exception(error_msg);
+    addr.sin_addr.s_addr = htonl(INADDR_ANY); // 🔁 Use htonl instead of htons for IPv4 address
+
+    sockaddr* generic_addr = static_cast<sockaddr*>(static_cast<void*>(&addr));
+    if (bind(fd, generic_addr, sizeof(addr)) == -1) {
+        auto error_msg = std::format("bind() failed  port: {} description: {}", port, str_error_cpp(errno));
+        throw server_startup_exception(error_msg);
     }
+
     listen(fd, SOMAXCONN);
     logger::log("epoll", "info", std::format("listen non-blocking socket FD: {} port: {}", fd, port));
     return fd;
@@ -402,22 +423,8 @@ void server::epoll_add_event(int fd, int epoll_fd, uint32_t event_flags) {
     epoll_ctl(epoll_fd, EPOLL_CTL_ADD, fd, &event);
 }
 
-std::string server::get_socket_error(const int& fd) {
-    int error = 0;
-    socklen_t errlen = sizeof(error);
-    
-    // getsockopt is thread-safe.
-    if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &error, &errlen) == 0 && error != 0) {
-        // std::error_code is the thread-safe C++ way to handle system error codes.
-        std::error_code ec(error, std::system_category());
-        return ec.message();
-    }
-    
-    return "`no error message available";
-}
-
-void server::epoll_handle_error(epoll_event& ev) {
-    --g_connections;
+void server::epoll_handle_error(const epoll_event& ev) {
+    --m_metrics.connections;
     if (auto it = buffers.find(ev.data.fd); it == buffers.end()) { 
 		logger::log("epoll", "error", std::format("EPOLLERR unable to retrieve request object for fd {}", get_fd(ev)));
     } else {
@@ -429,13 +436,12 @@ void server::epoll_handle_error(epoll_event& ev) {
     }
 }
 
-void server::epoll_handle_close(epoll_event& ev) {
-    --g_connections;
+void server::epoll_handle_close(const epoll_event& ev) {
+    --m_metrics.connections;
     if (auto it = buffers.find(ev.data.fd); it == buffers.end()) { 
         logger::log("epoll", "error", std::format("EPOLLRDHUP unable to retrieve request object for fd {}", get_fd(ev)));
     } else {
-        http::request& req = it->second;
-        if (close(req.fd) == -1)
+        if (http::request& req = it->second; close(req.fd) == -1)
             logger::log("epoll", "error", std::format("close FAILED for FD: {} description: {}", req.fd, str_error_cpp(errno)));
         buffers.erase(ev.data.fd);
     }
@@ -451,7 +457,7 @@ void server::epoll_handle_connect(const int& listen_fd, const int& epoll_fd) {
                 logger::log("epoll", "error", std::format("connection accept FAILED for epoll FD: {} description: {}", epoll_fd, str_error_cpp(errno)));
             return;
         }
-        ++g_connections;
+        ++m_metrics.connections;
 		auto remote_ip{get_peer_ip_ipv4(fd)};
         if (auto [iter, success] {buffers.try_emplace(fd, epoll_fd, fd, remote_ip)}; success) {
             epoll_event ev; 
@@ -465,7 +471,7 @@ void server::epoll_handle_connect(const int& listen_fd, const int& epoll_fd) {
     }
 }
 
-void server::epoll_abort_request(http::request& req, const http::status status_code, const std::string& msg_) {
+void server::epoll_abort_request(http::request& req, const http::status status_code, std::string_view msg_) {
     std::string msg {"Bad request"};
     if (status_code == http::status::not_found) {
         logger::log("epoll", "error", std::format("API not found: {} from IP {}", req.path, req.remote_ip), req.get_header("x-request-id"));
@@ -544,10 +550,10 @@ void server::epoll_send_ping(http::request& req) {
 void server::epoll_send_sysinfo(http::request& req)  {
     static const auto pool_size {env::pool_size()};
     static const size_t total_ram {util::get_total_memory()};
-    const size_t requests_total = g_counter.load(std::memory_order_relaxed);
-    const double total_processing_time = g_total_time.load(std::memory_order_relaxed);
-    const int active_threads_count = g_active_threads.load(std::memory_order_relaxed);
-    const size_t connections_count = g_connections.load(std::memory_order_relaxed);
+    const size_t requests_total = m_metrics.requests_total.load(std::memory_order_relaxed);
+    const double total_processing_time = m_metrics.total_processing_time.load(std::memory_order_relaxed);
+    const int active_threads_count = m_metrics.active_threads.load(std::memory_order_relaxed);
+    const size_t connections_count = m_metrics.connections.load(std::memory_order_relaxed);
     const auto mem_usage {util::get_memory_usage()};
     const double avg_time_per_request = (requests_total > 0) ? (total_processing_time / requests_total) : 0.0;
     constexpr auto json_template {
@@ -589,7 +595,7 @@ void server::epoll_handle_write(http::request& req)  {
 	}
 }
 
-void server::epoll_handle_IO(epoll_event& ev) {
+void server::epoll_handle_IO(const epoll_event& ev) {
     if (auto it = buffers.find(ev.data.fd); it == buffers.end()) {
         logger::log("epoll", "error", std::format("epoll_handle_IO() - unable to retrieve request object for fd {}", get_fd(ev)));
         return;
@@ -667,10 +673,10 @@ void server::register_diagnostic_services() {
 
     register_webapi(webapi_path("/api/metrics"), "Return metrics in Prometheus format", http::verb::GET,
         [this](http::request& req) {
-            const size_t requests_total = g_counter.load(std::memory_order_relaxed);
-            const double total_processing_time = g_total_time.load(std::memory_order_relaxed);
-            const int active_threads_count = g_active_threads.load(std::memory_order_relaxed);
-            const size_t connections_count = g_connections.load(std::memory_order_relaxed);
+            const size_t requests_total = m_metrics.requests_total.load(std::memory_order_relaxed);
+            const double total_processing_time = m_metrics.total_processing_time.load(std::memory_order_relaxed);
+            const int active_threads_count = m_metrics.active_threads.load(std::memory_order_relaxed);
+            const size_t connections_count = m_metrics.connections.load(std::memory_order_relaxed);
             const double avg_time = (requests_total > 0) ? total_processing_time / requests_total : 0.0;
             static const auto pool_size {env::pool_size()};
             std::string body;

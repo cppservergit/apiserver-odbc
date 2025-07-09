@@ -66,8 +66,9 @@ public:
         return *this;
     }
 
-    // Allow implicit conversion to int for easy use with C-style APIs.
-    operator int() const {
+    // Intentional implicit conversion for low-level API integration
+	// This wrapper is designed to mimic int file descriptors safely.
+	[[nodiscard]] operator int() const {
         return m_fd;
     }
 
@@ -141,6 +142,14 @@ public:
         std::string nodename;
         std::string x_request_id;
     };
+    
+    // Holds all server metrics in a single structure.
+    struct server_metrics {
+        std::atomic<size_t> requests_total{0};
+        std::atomic<double> total_processing_time{0};
+        std::atomic<int> active_threads{0};
+        std::atomic<size_t> connections{0};
+    };
 
 
     // --- Public Methods ---
@@ -193,10 +202,8 @@ public:
 	
 	class server_startup_exception : public std::runtime_error {
 	public:
-		explicit server_startup_exception(const std::string& message)
-			: std::runtime_error(message) {}
-	};	
-	
+		using std::runtime_error::runtime_error;
+	};
 
 private:
     // --- Private Methods ---
@@ -211,11 +218,10 @@ private:
     int get_signalfd() ;
     int get_listenfd(int port) ;
     void epoll_add_event(int fd, int epoll_fd, uint32_t event_flags) ;
-    std::string get_socket_error(const int& fd);
-    void epoll_handle_error(epoll_event& ev) ;
-    void epoll_handle_close(epoll_event& ev) ;
+    void epoll_handle_error(const epoll_event& ev) ;
+    void epoll_handle_close(const epoll_event& ev) ;
     void epoll_handle_connect(const int& listen_fd, const int& epoll_fd) ;
-    void epoll_abort_request(http::request& req, http::status status_code, const std::string& msg_ = "") ;
+    void epoll_abort_request(http::request& req, http::status status_code, std::string_view msg_ = "") ;
     void check_ready_queue() ;
     void producer(worker_params& wp) ;
     void run_async_task(http::request& req) ;
@@ -223,13 +229,12 @@ private:
     void epoll_send_sysinfo(http::request& req) ;
     void epoll_handle_read(http::request& req) ;
     void epoll_handle_write(http::request& req) ;
-    void epoll_handle_IO(epoll_event& ev) ;
+    void epoll_handle_IO(const epoll_event& ev) ;
     void epoll_loop(int listen_fd, int epoll_fd) ;
     void start_epoll(int port) ;
     void print_server_info() ;
     void register_diagnostic_services();
     void prebuilt_services();
-    std::string get_pod_name();
 	bool is_origin_allowed(const std::string& origin);
 	void shutdown();
 
@@ -237,10 +242,7 @@ private:
     std::unordered_map<std::string, std::shared_ptr<const webapi>, util::string_hash, std::equal_to<>> webapi_catalog;
     std::unordered_map<int, http::request> buffers;
     
-    std::atomic<size_t> g_counter{0};
-    std::atomic<double> g_total_time{0};
-    std::atomic<int> g_active_threads{0};
-    std::atomic<size_t> g_connections{0};
+    server_metrics m_metrics;
 
     std::queue<worker_params> m_queue;
     std::condition_variable m_cond;
