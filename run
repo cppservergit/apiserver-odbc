@@ -7,6 +7,8 @@ export CPP_POOL_SIZE=4
 # JWT config - NOTE: it is vital to use a hard-to-guess secret
 export CPP_JWT_SECRET="B@s!ca123*"
 export CPP_JWT_EXP=600
+# CORS
+export CPP_ALLOW_ORIGINS="null, file://, https://www.martincordova.com"
 # ODBC SQL authenticator config
 export CPP_LOGINDB="Driver=FreeTDS;SERVER=demodb.mshome.net;PORT=1433;DATABASE=testdb;UID=sa;PWD=Basica2024;APP=apiserver;Encryption=off;ClientCharset=UTF-8"
 # ODBC audit trail config
