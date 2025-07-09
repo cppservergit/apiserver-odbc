@@ -81,7 +81,7 @@ namespace sql::detail
 		SQLHSTMT hstmt = SQL_NULL_HSTMT;
 		std::unique_ptr<dbconn> conn;
 				
-		dbutil(): conn{nullptr} {}
+		dbutil() = default;
 	
 		explicit dbutil(std::string_view _name, std::string_view _connstr) noexcept: 
 		name{_name}, dbconnstr{_connstr}, conn{std::make_unique<dbconn>()}
@@ -187,7 +187,8 @@ namespace sql::detail
 }
 
 
-template <typename T> struct bind_traits;
+template <typename T>
+struct bind_traits;
 
 template <>
 struct bind_traits<int> {
@@ -213,7 +214,7 @@ struct bind_traits<std::string> {
     static constexpr SQLSMALLINT sql_type = SQL_VARCHAR;
 };
 
-
+// --- Bind a Single Parameter ---
 template <typename T>
 [[nodiscard]]
 inline auto bind_parameter(SQLHSTMT stmt, SQLUSMALLINT index, const T& value)
@@ -221,34 +222,49 @@ inline auto bind_parameter(SQLHSTMT stmt, SQLUSMALLINT index, const T& value)
 {
     using traits = bind_traits<T>;
 
-    if constexpr (std::is_same_v<T, std::string> || std::is_same_v<T, std::string_view>) {
-        const SQLINTEGER len = static_cast<SQLINTEGER>(value.size());
+    if constexpr (std::is_same_v<T, std::string_view>) {
+        std::string buffer{value}; // Safe mutable copy
+        const auto len = static_cast<SQLINTEGER>(buffer.size());
 
-        const SQLRETURN ret = SQLBindParameter(
-            stmt, index, SQL_PARAM_INPUT,
-            traits::c_type, traits::sql_type,
-            len, 0,
-            const_cast<char*>(value.data()), len, nullptr);
+        if (const SQLRETURN ret = SQLBindParameter(
+                stmt, index, SQL_PARAM_INPUT,
+                traits::c_type, traits::sql_type,
+                len, 0,
+                buffer.data(), len, nullptr);
+            ret != SQL_SUCCESS)
+        {
+            return std::unexpected(std::format("Failed to bind string_view at index {}", index));
+        }
 
-        if (ret != SQL_SUCCESS) {
-            return std::unexpected("Failed to bind string-like value at index " + std::to_string(index));
+    } else if constexpr (std::is_same_v<T, std::string>) {
+        const auto len = static_cast<SQLINTEGER>(value.size());
+
+        if (const SQLRETURN ret = SQLBindParameter(
+                stmt, index, SQL_PARAM_INPUT,
+                traits::c_type, traits::sql_type,
+                len, 0,
+                const_cast<char*>(value.data()), len, nullptr);
+            ret != SQL_SUCCESS)
+        {
+            return std::unexpected(std::format("Failed to bind string at index {}", index));
         }
 
     } else {
-        const SQLRETURN ret = SQLBindParameter(
-            stmt, index, SQL_PARAM_INPUT,
-            traits::c_type, traits::sql_type,
-            0, 0,
-            const_cast<void*>(static_cast<const void*>(&value)), 0, nullptr);
-
-        if (ret != SQL_SUCCESS) {
-            return std::unexpected("Failed to bind value at index " + std::to_string(index));
+        if (const SQLRETURN ret = SQLBindParameter(
+                stmt, index, SQL_PARAM_INPUT,
+                traits::c_type, traits::sql_type,
+                0, 0,
+                static_cast<const void*>(&value), 0, nullptr);
+            ret != SQL_SUCCESS)
+        {
+            return std::unexpected(std::format("Failed to bind value at index {}", index));
         }
     }
 
     return {};
 }
 
+// --- Bind an Optional Parameter ---
 template <typename T>
 [[nodiscard]]
 inline auto bind_parameter(SQLHSTMT stmt, SQLUSMALLINT index, const std::optional<T>& maybe)
@@ -259,42 +275,44 @@ inline auto bind_parameter(SQLHSTMT stmt, SQLUSMALLINT index, const std::optiona
     }
 
     using traits = bind_traits<T>;
+    SQLLEN null_indicator = SQL_NULL_DATA;
 
-    const SQLRETURN ret = SQLBindParameter(
-        stmt, index, SQL_PARAM_INPUT,
-        SQL_C_DEFAULT, traits::sql_type,
-        0, 0,
-        nullptr, 0,
-        reinterpret_cast<SQLLEN*>(SQL_NULL_DATA));
-
-    if (ret != SQL_SUCCESS) {
-        return std::unexpected("Failed to bind SQL NULL at index " + std::to_string(index));
+    if (const SQLRETURN ret = SQLBindParameter(
+            stmt, index, SQL_PARAM_INPUT,
+            SQL_C_DEFAULT, traits::sql_type,
+            0, 0,
+            nullptr, 0,
+            &null_indicator);
+        ret != SQL_SUCCESS)
+    {
+        return std::unexpected(std::format("Failed to bind SQL NULL at index {}", index));
     }
 
     return {};
 }
 
+// --- Bind All Parameters from Tuple ---
 template <std::size_t... Is, typename... Args>
 [[nodiscard]]
 inline auto bind_all(SQLHSTMT stmt, std::index_sequence<Is...>, const std::tuple<Args...>& params)
     -> std::expected<void, std::string>
 {
     std::expected<void, std::string> result{};
-
     bool success = true;
 
-    // Expand through fold trick using initializer list
     (void)(([&]() {
         if (!success) return;
-        auto bound = bind_parameter(stmt, static_cast<SQLUSMALLINT>(Is + 1), std::get<Is>(params));
-        if (!bound) {
-            result = std::unexpected(bound.error());
+        if (const auto ret = bind_parameter(stmt, static_cast<SQLUSMALLINT>(Is + 1), std::get<Is>(params));
+            !ret)
+        {
+            result = std::unexpected(ret.error());
             success = false;
         }
     }()), ...);
 
     return result;
 }
+
 
 
 namespace sql
@@ -313,7 +331,7 @@ namespace sql
 
 	template <typename... Args>
 	[[nodiscard]]
-	auto exec_sqlp(const std::string& dbname, std::string_view sql, Args&&... args) noexcept
+	auto exec_sqlp(const std::string& dbname, std::string_view sql, Args&&... args)
 		-> std::expected<void, std::string>
 	{
 		auto& db = sql::detail::getdb(dbname);

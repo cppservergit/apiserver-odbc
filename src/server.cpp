@@ -405,11 +405,10 @@ int server::get_listenfd(int port) {
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = htonl(INADDR_ANY); // 🔁 Use htonl instead of htons for IPv4 address
 
-    sockaddr* generic_addr = static_cast<sockaddr*>(static_cast<void*>(&addr));
-    if (bind(fd, generic_addr, sizeof(addr)) == -1) {
-        auto error_msg = std::format("bind() failed  port: {} description: {}", port, str_error_cpp(errno));
-        throw server_startup_exception(error_msg);
-    }
+	if (bind(fd, static_cast<const sockaddr*>(static_cast<void*>(&addr)), sizeof(addr)) == -1) {
+		auto error_msg = std::format("bind() failed  port: {} description: {}", port, str_error_cpp(errno));
+		throw server_startup_exception(error_msg);
+	}
 
     listen(fd, SOMAXCONN);
     logger::log("epoll", "info", std::format("listen non-blocking socket FD: {} port: {}", fd, port));
