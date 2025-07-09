@@ -3,8 +3,7 @@
  *
  *  Created on: Feb 21, 2023
  *      Author: Martin Cordova cppserver@martincordova.com - https://cppserver.com
- *      Disclaimer: some parts of this library may have been taken from sample code publicly available
- *		and written by third parties. Free to use in commercial projects, no warranties and no responsabilities assumed 
+ *      Disclaimer: Free to use in commercial projects, no warranties and no responsabilities assumed 
  *		by the author, use at your own risk. By using this code you accept the forementioned conditions.
  */
 #ifndef LOGIN_H_

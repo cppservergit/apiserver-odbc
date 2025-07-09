@@ -241,6 +241,34 @@ namespace http
 
 	void response_stream::set_body(std::string_view body, std::string_view content_type)
 	{
+		constexpr auto resp {
+			"HTTP/1.1 200 OK\r\n"
+			"Content-Length: {}\r\n"
+			"Content-Type: {}\r\n"
+			"Date: {:%a, %d %b %Y %H:%M:%S GMT}\r\n"
+			"Access-Control-Allow-Origin: {}\r\n"
+			"Strict-Transport-Security: max-age=31536000; includeSubDomains; preload;\r\n"
+			"X-Frame-Options: SAMEORIGIN\r\n"
+			"X-Content-Type-Options: nosniff\r\n"
+			"Referrer-Policy: no-referrer\r\n"
+			"Cache-Control: no-store\r\n"
+			"Cross-Origin-Resource-Policy: cross-origin\r\n"
+			"Connection: close\r\n"
+			"\r\n"
+			"{}" 
+		};
+							
+		_buffer.append(std::format(resp, 
+			body.size(),
+			content_type,
+			std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now()),
+			_origin,
+			body
+		));
+	}
+	
+	void response_stream::set_body_blob(std::string_view body, std::string_view content_type)
+	{
 		constexpr auto resp { 	
 			"HTTP/1.1 200 OK\r\n"
 			"Content-Length: {}\r\n"
@@ -250,17 +278,19 @@ namespace http
 			"Access-Control-Expose-Headers: content-disposition\r\n"
 			"Strict-Transport-Security: max-age=31536000; includeSubDomains; preload;\r\n"
 			"X-Frame-Options: SAMEORIGIN\r\n"
+			"X-Content-Type-Options: nosniff\r\n"
+			"Referrer-Policy: no-referrer\r\n"
+			"Cache-Control: no-store\r\n"
+			"Cross-Origin-Resource-Policy: cross-origin\r\n"
 			"Content-Disposition: {}\r\n"
 			"Connection: close\r\n"
 			"\r\n"
 			"{}" 
 		};
 							
-		if (_origin.empty()) {
-			logger::log("http-response", "error", "set_body() - origin is empty, setting its value to *");
-			_origin = "*";
-		}
-							
+		if (_origin.empty())
+			logger::log("http", "warn", "set_body_blob() - origin is empty", _x_request_id);
+									
 		_buffer.append(std::format(resp, 
 			body.size(),
 			content_type,
@@ -269,7 +299,7 @@ namespace http
 			_content_disposition,
 			body
 		));
-	}
+	}	
 	
 	void response_stream::set_content_disposition(std::string_view disposition)
 	{
@@ -280,6 +310,11 @@ namespace http
 	{
 		_origin = origin;
 	}
+	
+	void response_stream::set_request_id(std::string_view req_id)
+	{
+		_x_request_id = req_id;
+	}	
 	
 	response_stream& response_stream::operator <<(std::string_view data) {
 		_buffer.append(data);
@@ -339,32 +374,6 @@ namespace http
 			}
 		}
 	}
-
-	void request::clear() 
-	{
-		response.clear();
-		payload.clear();
-		headers.clear();
-		params.clear();
-		input_rules.clear();
-		internals.errcode = 0;
-		internals.errmsg = "";
-		internals.bodyStartPos = 0;
-		internals.contentLength = 0;
-		origin = "null";
-		queryString = "";
-		path = "";
-		boundary = "";
-		token = "";
-		method = "";
-		isMultipart = false;
-		save_blob_failed = false;
-		user_info.login = "";
-		user_info.mail = "";
-		user_info.roles = "";
-		user_info.exp = 0;
-	}
-	
 	
 	void request::enforce(verb v) const {
 		const std::array<std::string, 2> methods {"GET", "POST"};
@@ -572,6 +581,7 @@ namespace http
 			parse_query_string(queryString);
 		
 		response.set_origin(origin);
+		response.set_request_id(get_header("x-request-id"));
 	}
 	
 	void request::parse_form() 
@@ -741,21 +751,30 @@ namespace http
 	void request::send_mail(const std::string& to, const std::string& cc, const std::string& subject, const std::string& body, 
 		const std::string& attachment, const std::string& attachment_filename)
 	{
-		const auto mail_body {get_mail_body(this, body)};
-		const auto x_request_id {get_header("x-request-id")};
+		auto mail_to = to;
+		auto mail_body {get_mail_body(this, body)};
+		auto x_request_id {get_header("x-request-id")};
 		[[maybe_unused]] auto task = std::async(std::launch::async, 
-			[to, cc, subject, mail_body, attachment, attachment_filename, x_request_id]() 
+			[
+				to_ = std::move(mail_to), 
+				cc_ = std::move(cc), 
+				subject_ = std::move(subject), 
+				body_ = std::move(mail_body), 
+				attachment_ = std::move(attachment), 
+				attachment_filename_ = std::move(attachment_filename),
+				x_request_id_ = std::move(x_request_id)
+			]() 
 			{
-				smtp::mail m(env::get_str("CPP_MAIL_SERVER"), env::get_str("CPP_MAIL_USER"), env::get_str("CPP_MAIL_PWD"));
-				m.set_x_request_id(x_request_id);
-				m.set_to(to);
-				m.set_cc(cc);
-				m.set_subject(subject);
-				m.set_body(mail_body);
-				if (!attachment.empty()) {
-					std::string filepath {attachment.starts_with("/") ? attachment : "/var/blobs/" + attachment};
-					if (!attachment_filename.empty())
-						m.add_attachment(filepath, attachment_filename);
+ 				smtp::mail m(env::get_str("CPP_MAIL_SERVER"), env::get_str("CPP_MAIL_USER"), env::get_str("CPP_MAIL_PWD"));
+				m.set_x_request_id(x_request_id_);
+				m.set_to(to_);
+				m.set_cc(cc_);
+				m.set_subject(subject_);
+				m.set_body(body_);
+				if (!attachment_.empty()) {
+					std::string filepath {attachment_.starts_with("/") ? attachment_ : "/var/blobs/" + attachment_};
+					if (!attachment_filename_.empty())
+						m.add_attachment(filepath, attachment_filename_);
 					else
 						m.add_attachment(filepath);
 				}

@@ -51,7 +51,6 @@ dbconn& dbconn::operator=(dbconn&& other) noexcept {
 // It will now only free handles if they are not null.
 dbconn::~dbconn() {
     if (henv != SQL_NULL_HENV) {
-        logger::log("odbcutil", "debug", std::format("Closing ODBC connection {:p} {}", static_cast<void*>(this), name));
         SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
         SQLDisconnect(hdbc);
         SQLFreeHandle(SQL_HANDLE_DBC, hdbc);

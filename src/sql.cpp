@@ -2,32 +2,9 @@
 
 namespace 
 {
-	constexpr int max_retries {10};
-	const std::string LOGGER_SRC {"sql-odbc"};
+	//using namespace sql::detail;
 	
-	std::pair<std::string, std::string> get_error_msg(SQLHENV henv, SQLHDBC hdbc, SQLHSTMT hstmt) noexcept
-	{
-	    std::array<SQLCHAR, 10> szSQLSTATE;
-	    SDWORD nErr;
-		std::array<SQLCHAR, SQL_MAX_MESSAGE_LENGTH + 1> msg;
-	    SWORD cbmsg;
-	    SQLError(henv, hdbc, hstmt, szSQLSTATE.data(), &nErr, msg.data(), msg.size(), &cbmsg);
-		const std::string sqlState {std::bit_cast<char*>(szSQLSTATE.data())};
-		const std::string sqlErrorMsg {std::bit_cast<char*>(msg.data())};
-		return std::make_pair(sqlErrorMsg, sqlState);
-	}
-
-	std::tuple<SDWORD, std::string, std::string> get_error_info(SQLHENV henv, SQLHDBC hdbc, SQLHSTMT hstmt) noexcept
-	{
-	    std::array<SQLCHAR, 10> szSQLSTATE;
-	    SDWORD nErr;
-		std::array<SQLCHAR, SQL_MAX_MESSAGE_LENGTH + 1> msg;
-	    SWORD cbmsg;
-	    SQLError(henv, hdbc, hstmt, szSQLSTATE.data(), &nErr, msg.data(), msg.size(), &cbmsg);
-		const std::string sqlState {std::bit_cast<char*>(szSQLSTATE.data())};
-		const std::string sqlErrorMsg {std::bit_cast<char*>(msg.data())};
-		return make_tuple(nErr, sqlState, sqlErrorMsg);
-	}
+	constexpr int max_retries {10};
 
 	struct col_info {
 		std::string colname;
@@ -67,80 +44,6 @@ namespace
 		
 		return cols;
 	}
-
-	struct dbutil 
-	{
-		std::string name;
-		std::string dbconnstr;
-		SQLHENV henv = SQL_NULL_HENV;
-		SQLHDBC hdbc = SQL_NULL_HDBC;
-		SQLHSTMT hstmt = SQL_NULL_HSTMT;
-		std::unique_ptr<dbconn> conn;
-				
-		dbutil(): conn{nullptr} {}
-	
-		explicit dbutil(std::string_view _name, std::string_view _connstr) noexcept: 
-		name{_name}, dbconnstr{_connstr}, conn{std::make_unique<dbconn>()}
-		{
-			connect();
-		}
-		
-		constexpr void close() {
-			if (henv) {
-				logger::log(LOGGER_SRC, "debug", std::format("closing ODBC connection for reset: {} {:p}", name, static_cast<void*>(conn.get())));
-				SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
-				SQLDisconnect(hdbc);
-				SQLFreeHandle(SQL_HANDLE_DBC, hdbc);
-				SQLFreeHandle( SQL_HANDLE_ENV, henv );
-			}
-		}
-	
-		constexpr void reset_connection()
-		{
-			logger::log(LOGGER_SRC, "warn", std::format("resetting ODBC connection: {}", name));
-			close();
-			connect();
-		}
-		
-	private:
-		constexpr void connect()
-		{
-			RETCODE rc {SQL_SUCCESS};
-			rc = SQLAllocHandle ( SQL_HANDLE_ENV, SQL_NULL_HANDLE, &henv );
-			if ( rc != SQL_SUCCESS ) {
-				logger::log(LOGGER_SRC, "error", "SQLAllocHandle for henv failed");
-			}
-
-			rc = SQLSetEnvAttr(henv, SQL_ATTR_ODBC_VERSION, (SQLPOINTER)SQL_OV_ODBC3 , 0 );
-			if ( rc != SQL_SUCCESS ) {
-				logger::log(LOGGER_SRC, "error", "SQLSetEnvAttr failed to set ODBC version");
-			}
-
-			auto dsn = (SQLCHAR*)dbconnstr.data();
-			SQLSMALLINT bufflen;
-			rc = SQLAllocHandle (SQL_HANDLE_DBC, henv, &hdbc);
-			if ( rc != SQL_SUCCESS ) {
-				logger::log(LOGGER_SRC, "error", "SQLAllocHandle for hdbc failed");
-			}
-		
-			rc = SQLDriverConnect(hdbc, nullptr, dsn, SQL_NTS, nullptr, 0, &bufflen, SQL_DRIVER_NOPROMPT);
-			if (rc!=SQL_SUCCESS && rc!=SQL_SUCCESS_WITH_INFO) {
-				auto [error, sqlstate] {get_error_msg(henv, hdbc, hstmt)};
-				logger::log(LOGGER_SRC, "error", std::format("SQLDriverConnect failed: {}", error));
-			} else {
-				SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);	
-				auto dbc = conn.get();
-				if (dbc) {
-					dbc->name = name;
-					dbc->henv = henv;
-					dbc->hdbc = hdbc;
-					dbc->hstmt = hstmt;
-					logger::log(LOGGER_SRC, "debug", std::format("connection to ODBC database established {:p} {}", static_cast<void*>(dbc), dbc->name));
-				}
-			}
-		}
-	
-	};
 
 	sql::recordset get_recordset(SQLHSTMT hstmt) 
 	{
@@ -227,57 +130,15 @@ namespace
 	    json.append("]");
 	}
 
-	struct dbconns {
-		constexpr static int MAX_CONNS {5};
-		std::array<dbutil, MAX_CONNS> conns;
-		int index {0};
-		dbutil nulldb;
-
-		constexpr auto get(std::string_view name, bool reset = false) noexcept
-		{
-			for (auto& db: conns) 
-				if (db.name == name) {
-					if (reset)
-						db.reset_connection();
-					return std::make_pair(true, &db);
-				}
-			return std::make_pair(false, &nulldb);
-		}
-
-		constexpr dbutil& add(std::string_view name, std::string_view connstr)
-		{
-			if (index == MAX_CONNS)
-				throw sql::database_exception(std::format("dbconns::add() -> no more than {} database connections allowed: {}", MAX_CONNS, name));
-			
-			conns[index] = dbutil(name, connstr);
-			++index;
-			return conns[index - 1];
-		}
-	};
-
-
-	constexpr dbutil& getdb(const std::string_view name, bool reset = false)
+	inline void retry(RETCODE rc, const std::string& dbname, const sql::detail::dbutil& db, int& retries, const std::string& sql)
 	{
-	    thread_local dbconns dbc;
-		
-		if (auto [result, db]{dbc.get(name, reset)}; result) {
-			return *db;
-		} else {
-			const std::string v {name};
-			auto connstr {env::get_str(v)};
-			return dbc.add(name, connstr);
-		}
-	}
-
-	inline void retry(RETCODE rc, const std::string& dbname, const dbutil& db, int& retries, const std::string& sql)
-	{
-		auto [error_code, sqlstate, error_msg] {get_error_info(db.henv, db.hdbc, db.hstmt)};
+		auto [error_code, sqlstate, error_msg] {sql::detail::get_error_info(db.henv, db.hdbc, db.hstmt)};
 		if (sqlstate == "HY000" || sqlstate == "01000" || sqlstate == "08S01" || rc == SQL_INVALID_HANDLE) {
 			if (retries == max_retries) {
 				throw sql::database_exception(std::format("retry() -> cannot connect to database:: {}", dbname));
 			} else {
 				retries++;
-				getdb(dbname, true);
+				sql::detail::getdb(dbname, true);
 			}
 		} else {
 			throw sql::database_exception(std::format("db_exec() Error Code: {} SQLSTATE: {} {} -> sql: {}", error_code, sqlstate, error_msg, sql));
@@ -293,7 +154,7 @@ namespace
 		int retries {0};
 
 		while (true) {
-			auto& db = getdb(dbname);
+			auto& db = sql::detail::getdb(dbname);
 			rc = SQLExecDirect(db.hstmt, sqlcmd, SQL_NTS);
 			if (rc != SQL_SUCCESS  && rc != SQL_NO_DATA)
 				retry(rc, dbname, db, retries, sql);
@@ -301,7 +162,7 @@ namespace
 				return func(db.hstmt);
 		}
 	}
-	
+
 }
 
 namespace sql 
@@ -438,6 +299,7 @@ namespace sql
 		json.append("]");
 		return json;
 	}
+	
 }
 
 

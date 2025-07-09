@@ -4,8 +4,7 @@
  *
  *  Created on: Feb 21, 2023
  *      Author: Martin Cordova cppserver@martincordova.com - https://cppserver.com
- *      Disclaimer: some parts of this library may have been taken from sample code publicly available
- *		and written by third parties. Free to use in commercial projects, no warranties and no responsabilities assumed 
+ *      Free to use in commercial projects, no warranties and no responsabilities assumed 
  *		by the author, use at your own risk. By using this code you accept the forementioned conditions.
  */
 #ifndef HTTPUTILS_H_
@@ -37,6 +36,30 @@
 namespace http
 {
 	const std::string blob_path {"/var/blobs/"};
+
+	enum class status {
+        ok = 200,
+        no_content = 204,
+        bad_request = 400,
+        unauthorized = 401,
+        forbidden = 403,
+        not_found = 404,
+        method_not_allowed = 405
+    };
+	
+	inline std::ostream& operator<<(std::ostream& os, status s) {
+		using namespace std::string_view_literals;
+		switch (s) {
+			case status::ok:                 return os << "200"sv;
+			case status::no_content:         return os << "204"sv;
+			case status::bad_request:        return os << "400"sv;
+			case status::unauthorized:       return os << "401"sv;
+			case status::forbidden:          return os << "403"sv;
+			case status::not_found:          return os << "404"sv;
+			case status::method_not_allowed: return os << "405"sv;
+			default:                         return os << "Unknown Status";
+		}
+	}
 	
 	std::string get_uuid() noexcept;
 	
@@ -221,8 +244,10 @@ namespace http
 		response_stream();
 		response_stream& operator <<(std::string_view data);
 		void set_body(std::string_view body, std::string_view content_type = "application/json");
+		void set_body_blob(std::string_view body, std::string_view content_type);
 		void set_content_disposition(std::string_view disposition);
 		void set_origin(std::string_view origin);
+		void set_request_id(std::string_view req_id);
 		std::string_view view() const noexcept;
 		size_t size() const noexcept;
 		const char* data() const noexcept;
@@ -233,6 +258,7 @@ namespace http
 		std::string _buffer{""};
 		std::string _content_disposition{""};
 		std::string _origin{""};
+		std::string _x_request_id{""};
 	};
 		
 	struct line_reader {
@@ -261,7 +287,7 @@ namespace http
 		std::string path;
 		std::string boundary;
 		std::string token;
-		std::string origin{"null"};
+		std::string origin;
 		socket_buffer payload;
 		std::map<std::string, std::string, std::less<>> headers;
 		std::map<std::string, std::string, std::less<>> params;
@@ -269,11 +295,10 @@ namespace http
 		jwt::user_info user_info;
 		response_stream response;
 		
-		explicit request(int epollfd, int fdes, const char* ip): epoll_fd{epollfd}, fd {fdes}, remote_ip {ip}
+		explicit request(int epollfd, int fdes, const std::string& ip): epoll_fd{epollfd}, fd {fdes}, remote_ip {ip}
 		{ }
 
 		request() = default;
-		void clear();
 		void parse();
 		bool eof();
 		std::string get_header(const std::string& name) const;
@@ -316,6 +341,14 @@ namespace http
 		void parse_form();
 	};
 }
+
+template <>
+struct std::formatter<http::status, char> {
+    constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+    auto format(http::status s, std::format_context& ctx) const {
+        return std::format_to(ctx.out(), "{}", static_cast<int>(s));
+    }
+};
 
 #endif /* HTTPUTILS_H_ */
 

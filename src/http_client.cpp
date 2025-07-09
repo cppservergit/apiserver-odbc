@@ -12,6 +12,7 @@
 #include <limits>
 #include <functional> // For std::less
 #include <cstdlib>    // for std::abort
+#include <format> 
 
 namespace {
 
@@ -182,8 +183,9 @@ void http_client::impl::configure_post_body(/* NOSONAR */ CURL* curl, const std:
     }
 
     if (CURLcode res = curl_easy_perform(curl); res != CURLE_OK) {
-        throw curl_exception(std::string("curl_easy_perform() failed: ") + curl_easy_strerror(res));
-    }
+		auto error_msg = curl_easy_strerror(res);
+		throw curl_exception(std::format("curl_easy_perform() failed for URL {} - {}", url, error_msg));
+	}
 
     curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response.status_code);
     

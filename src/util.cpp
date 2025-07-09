@@ -28,6 +28,11 @@ namespace util
 		return std::format("{:%F}", std::chrono::system_clock::now());
 	}
 	
+	std::string current_timestamp() noexcept
+	{
+		return std::format("{:%FT%T}", std::chrono::get_tzdb().current_zone()->to_local(std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now())));
+	}	
+	
 	std::string encode_json(const std::string& s) noexcept
 	{
 		std::ostringstream out;

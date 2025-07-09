@@ -14,6 +14,7 @@
 #include <chrono>
 #include <memory>
 #include <atomic>
+#include <unordered_set>
 #include "util.h"
 #include "env.h"
 #include "logger.h"
@@ -30,6 +31,56 @@ extern const char* const LOGGER_SRC;
 // Type aliases for API definitions
 using rules = std::vector<http::input_rule>;
 using roles = std::vector<std::string>;
+
+class file_descriptor {
+public:
+    // Constructor takes ownership of the file descriptor.
+    explicit file_descriptor(int fd = -1) : m_fd(fd) {}
+
+    // Destructor automatically closes the file descriptor.
+    ~file_descriptor() {
+        if (m_fd != -1) {
+            close(m_fd);
+        }
+    }
+
+    // --- Rule of Five: Non-copyable, but movable ---
+    file_descriptor(const file_descriptor&) = delete;
+    file_descriptor& operator=(const file_descriptor&) = delete;
+
+    file_descriptor(file_descriptor&& other) noexcept : m_fd(other.m_fd) {
+        // The moved-from object no longer owns the descriptor.
+        other.m_fd = -1;
+    }
+
+    file_descriptor& operator=(file_descriptor&& other) noexcept {
+        if (this != &other) {
+            // Close the current descriptor if it's valid.
+            if (m_fd != -1) {
+                close(m_fd);
+            }
+            // Take ownership from the other object.
+            m_fd = other.m_fd;
+            other.m_fd = -1;
+        }
+        return *this;
+    }
+
+    // Allow implicit conversion to int for easy use with C-style APIs.
+    operator int() const {
+        return m_fd;
+    }
+
+private:
+    int m_fd;
+};
+
+template<>
+struct std::formatter<file_descriptor> : std::formatter<int> {
+	auto format(const file_descriptor& fd, std::format_context& ctx) const {
+		return std::formatter<int>::format(static_cast<int>(fd), ctx);
+	}
+};
 
 // Compile-time validated path for WebAPIs
 struct webapi_path {
@@ -50,7 +101,7 @@ public:
                 throw std::string("Invalid WebAPI path -> contains an invalid character");
     }
     
-    std::string get() const noexcept {
+    std::string get() const  {
         return std::string(m_path);
     }
 
@@ -139,39 +190,48 @@ public:
             _is_secure
         );
     }
+	
+	class server_startup_exception : public std::runtime_error {
+	public:
+		explicit server_startup_exception(const std::string& message)
+			: std::runtime_error(message) {}
+	};	
+	
 
 private:
     // --- Private Methods ---
     void send_options(http::request& req);
-    void send_error(http::request& req, int status, std::string_view msg);
+    void send_error(http::request& req, http::status status, std::string_view msg);
     void save_audit_trail(const audit_trail& at);
     void execute_service(http::request& req, const std::shared_ptr<const webapi>& api_ptr);
-    void process_request(http::request& req, const std::shared_ptr<const webapi>& api_ptr) noexcept;
-    void log_request(const http::request& req, double duration) noexcept;
-    void http_server(http::request& req, const std::shared_ptr<const webapi>& api_ptr) noexcept;
-    bool read_request(http::request& req, int bytes) noexcept;
-    int get_signalfd() noexcept;
-    int get_listenfd(int port) noexcept;
-    void epoll_add_event(int fd, int epoll_fd, uint32_t event_flags) noexcept;
+    void process_request(http::request& req, const std::shared_ptr<const webapi>& api_ptr) ;
+    void log_request(const http::request& req, double duration) ;
+    void http_server(http::request& req, const std::shared_ptr<const webapi>& api_ptr) ;
+    bool read_request(http::request& req, int bytes) ;
+    int get_signalfd() ;
+    int get_listenfd(int port) ;
+    void epoll_add_event(int fd, int epoll_fd, uint32_t event_flags) ;
     std::string get_socket_error(const int& fd);
-    void epoll_handle_error(epoll_event& ev) noexcept;
-    void epoll_handle_close(epoll_event& ev) noexcept;
-    void epoll_handle_connect(const int& listen_fd, const int& epoll_fd) noexcept;
-    void epoll_abort_request(http::request& req, int status_code) noexcept;
-    void check_ready_queue() noexcept;
-    void producer(worker_params& wp) noexcept;
-    void run_async_task(http::request& req) noexcept;
+    void epoll_handle_error(epoll_event& ev) ;
+    void epoll_handle_close(epoll_event& ev) ;
+    void epoll_handle_connect(const int& listen_fd, const int& epoll_fd) ;
+    void epoll_abort_request(http::request& req, http::status status_code, const std::string& msg_ = "") ;
+    void check_ready_queue() ;
+    void producer(worker_params& wp) ;
+    void run_async_task(http::request& req) ;
     void epoll_send_ping(http::request& req);
-    void epoll_send_sysinfo(http::request& req) noexcept;
-    void epoll_handle_read(epoll_event& ev) noexcept;
-    void epoll_handle_write(epoll_event& ev) noexcept;
-    void epoll_handle_IO(epoll_event& ev) noexcept;
-    void epoll_loop(int listen_fd, int epoll_fd) noexcept;
-    void start_epoll(int port) noexcept;
-    void print_server_info() noexcept;
+    void epoll_send_sysinfo(http::request& req) ;
+    void epoll_handle_read(http::request& req) ;
+    void epoll_handle_write(http::request& req) ;
+    void epoll_handle_IO(epoll_event& ev) ;
+    void epoll_loop(int listen_fd, int epoll_fd) ;
+    void start_epoll(int port) ;
+    void print_server_info() ;
     void register_diagnostic_services();
     void prebuilt_services();
     std::string get_pod_name();
+	bool is_origin_allowed(const std::string& origin);
+	void shutdown();
 
     // --- Private Members ---
     std::unordered_map<std::string, std::shared_ptr<const webapi>, util::string_hash, std::equal_to<>> webapi_catalog;
@@ -193,15 +253,22 @@ private:
     std::queue<http::request> m_ready_queue;
     std::mutex m_ready_mutex;
     
-    int m_signal;
+    file_descriptor m_signal;
     const std::string pod_name;
     const std::string server_start_date;
     bool enable_audit {false};
-    std::chrono::time_point<std::chrono::high_resolution_clock> _start_init{};
     
+	const std::unordered_set<std::string> ALLOWED_ORIGINS;
+	
+	//thread pool and shutdown support
+	std::vector<std::stop_source> m_stops;
+	std::vector<std::jthread> m_pool;
+	std::stop_source m_audit_stop;
+    std::jthread m_audit_engine;
+	
     // Allow consumer and audit lambdas to access private members
-    friend auto consumer(std::stop_token, server*) noexcept;
-    friend auto audit(std::stop_token, server*) noexcept;
+    friend auto consumer(std::stop_token, server*) ;
+    friend auto audit(std::stop_token, server*) ;
 };
 
 #endif // SERVER_H_

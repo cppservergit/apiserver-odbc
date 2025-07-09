@@ -6,6 +6,11 @@
 #ifndef JWT_H_
 #define JWT_H_
 
+#include <vector>
+#include <span>
+#include <optional>
+#include <cstddef>
+#include <bit>
 #include <string>
 #include <vector>
 #include <string_view>
@@ -13,6 +18,7 @@
 #include <chrono>
 #include <algorithm>
 #include <array>
+#include <type_traits>
 #include <openssl/hmac.h>
 #include "logger.h"
 #include "env.h"
@@ -46,7 +52,7 @@ namespace jwt
 		@param mail user's email
 		@param roles user's security role names separated by comma
 	*/	
-	std::string get_token(std::string_view sessionid, std::string_view username, std::string_view mail, std::string_view roles) noexcept;
+	std::string get_token(std::string_view sessionid, std::string_view username, std::string_view mail, std::string_view roles);
 	
 	/** 
 		@brief Validates a token's signature using the secret and expiration
