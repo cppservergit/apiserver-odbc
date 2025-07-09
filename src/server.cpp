@@ -20,19 +20,22 @@
 namespace {
 	std::string get_pod_name() 
 	{
-		long host_name_max = sysconf(_SC_HOST_NAME_MAX);
+		auto host_name_max = sysconf(_SC_HOST_NAME_MAX);
 		if (host_name_max <= 0) 
 			host_name_max = HOST_NAME_MAX;
-		
-		std::string hostname(host_name_max, '\0');
+
+		std::string hostname(static_cast<std::size_t>(host_name_max), '\0');
 
 		if (gethostname(hostname.data(), hostname.size()) != 0)
 			return "hostname not available";
 
-		hostname.resize(std::strlen(hostname.data()));
-		
-		return hostname;	
+		// Trim trailing nulls by finding the first null character
+		auto actual_size = std::find(hostname.begin(), hostname.end(), '\0') - hostname.begin();
+		hostname.resize(actual_size);
+
+		return hostname;
 	}
+
 	
 	std::string get_socket_error(const int& fd) {
 		int error = 0;

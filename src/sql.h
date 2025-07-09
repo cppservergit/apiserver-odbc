@@ -1,9 +1,9 @@
 /*
  * sql - json microservices ODBC utility API - depends on  unixodbc-dev
  *
- *  Created on: March 23, 2023
- *      Author: Martín Córdova cppserver@martincordova.com - https://cppserver.com
- *      Disclaimer: Free to use in commercial projects, no warranties and no responsabilities assumed 
+ * Created on: March 23, 2023
+ * Author: Martín Córdova cppserver@martincordova.com - https://cppserver.com
+ * Disclaimer: Free to use in commercial projects, no warranties and no responsabilities assumed
  *		by the author, use at your own risk. By using this code you accept the forementioned conditions.
  */
 #ifndef SQLODBC_H_
@@ -25,6 +25,7 @@
 #include <unordered_map>
 #include <algorithm>
 #include <expected>
+#include <optional>
 #include "util.h"
 #include "logger.h"
 #include "env.h"
@@ -46,7 +47,7 @@ namespace sql
 	};
 }
 
-namespace sql::detail 
+namespace sql::detail
 {
 	inline std::pair<std::string, std::string> get_error_msg(SQLHENV henv, SQLHDBC hdbc, SQLHSTMT hstmt) noexcept
 	{
@@ -55,11 +56,11 @@ namespace sql::detail
 		std::array<SQLCHAR, SQL_MAX_MESSAGE_LENGTH + 1> msg;
 	    SWORD cbmsg;
 	    SQLError(henv, hdbc, hstmt, szSQLSTATE.data(), &nErr, msg.data(), msg.size(), &cbmsg);
-		const std::string sqlState {std::bit_cast<char*>(szSQLSTATE.data())};
-		const std::string sqlErrorMsg {std::bit_cast<char*>(msg.data())};
+		const std::string sqlState {reinterpret_cast<char*>(szSQLSTATE.data())};
+		const std::string sqlErrorMsg {reinterpret_cast<char*>(msg.data())};
 		return std::make_pair(sqlErrorMsg, sqlState);
 	}
-	
+
 	inline std::tuple<SDWORD, std::string, std::string> get_error_info(SQLHENV henv, SQLHDBC hdbc, SQLHSTMT hstmt) noexcept
 	{
 	    std::array<SQLCHAR, 10> szSQLSTATE;
@@ -67,12 +68,12 @@ namespace sql::detail
 		std::array<SQLCHAR, SQL_MAX_MESSAGE_LENGTH + 1> msg;
 	    SWORD cbmsg;
 	    SQLError(henv, hdbc, hstmt, szSQLSTATE.data(), &nErr, msg.data(), msg.size(), &cbmsg);
-		const std::string sqlState {std::bit_cast<char*>(szSQLSTATE.data())};
-		const std::string sqlErrorMsg {std::bit_cast<char*>(msg.data())};
+		const std::string sqlState {reinterpret_cast<char*>(szSQLSTATE.data())};
+		const std::string sqlErrorMsg {reinterpret_cast<char*>(msg.data())};
 		return make_tuple(nErr, sqlState, sqlErrorMsg);
 	}
 
-	struct dbutil 
+	struct dbutil
 	{
 		std::string name;
 		std::string dbconnstr;
@@ -80,15 +81,15 @@ namespace sql::detail
 		SQLHDBC hdbc = SQL_NULL_HDBC;
 		SQLHSTMT hstmt = SQL_NULL_HSTMT;
 		std::unique_ptr<dbconn> conn;
-				
+
 		dbutil() = default;
-	
-		explicit dbutil(std::string_view _name, std::string_view _connstr) noexcept: 
+
+		explicit dbutil(std::string_view _name, std::string_view _connstr) noexcept:
 		name{_name}, dbconnstr{_connstr}, conn{std::make_unique<dbconn>()}
 		{
 			connect();
 		}
-		
+
 		void close() {
 			if (henv) {
 				logger::log(SQL_LOGGER_SRC, "debug", std::format("closing ODBC connection for reset: {} {:p}", name, static_cast<void*>(conn.get())));
@@ -98,14 +99,14 @@ namespace sql::detail
 				SQLFreeHandle( SQL_HANDLE_ENV, henv );
 			}
 		}
-	
+
 		void reset_connection()
 		{
 			logger::log(SQL_LOGGER_SRC, "warn", std::format("resetting ODBC connection: {}", name));
 			close();
 			connect();
 		}
-		
+
 	private:
 		void connect()
 		{
@@ -126,13 +127,13 @@ namespace sql::detail
 			if ( rc != SQL_SUCCESS ) {
 				logger::log(SQL_LOGGER_SRC, "error", "SQLAllocHandle for hdbc failed");
 			}
-		
+
 			rc = SQLDriverConnect(hdbc, nullptr, dsn, SQL_NTS, nullptr, 0, &bufflen, SQL_DRIVER_NOPROMPT);
 			if (rc!=SQL_SUCCESS && rc!=SQL_SUCCESS_WITH_INFO) {
 				auto [error, sqlstate] {get_error_msg(henv, hdbc, hstmt)};
 				logger::log(SQL_LOGGER_SRC, "error", std::format("SQLDriverConnect failed: {}", error));
 			} else {
-				SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);	
+				SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);
 				auto dbc = conn.get();
 				if (dbc) {
 					dbc->name = name;
@@ -142,8 +143,8 @@ namespace sql::detail
 				}
 			}
 		}
-	
-	};	
+
+	};
 
 	struct dbconns {
 		constexpr static int MAX_CONNS {5};
@@ -153,7 +154,7 @@ namespace sql::detail
 
 		auto get(std::string_view name, bool reset = false) noexcept
 		{
-			for (auto& db: conns) 
+			for (auto& db: conns)
 				if (db.name == name) {
 					if (reset)
 						db.reset_connection();
@@ -166,13 +167,13 @@ namespace sql::detail
 		{
 			if (index == MAX_CONNS)
 				throw sql::database_exception(std::format("dbconns::add() -> no more than {} database connections allowed: {}", MAX_CONNS, name));
-			
+
 			conns[index] = dbutil(name, connstr);
 			++index;
 			return conns[index - 1];
 		}
 	};
-		
+
 	inline dbutil& getdb(std::string_view name, bool reset = false) {
 		thread_local dbconns dbc;
 
@@ -184,6 +185,18 @@ namespace sql::detail
 			return dbc.add(name, connstr);
 		}
 	}
+
+    // FIX: Helper to convert string-like arguments into owning std::strings
+    // to ensure their lifetime persists through the SQLExecute call.
+    template<typename T>
+    auto transform_arg_for_binding(T&& arg) {
+        using DecayedT = std::decay_t<T>;
+        if constexpr (std::is_same_v<DecayedT, const char*> || std::is_same_v<DecayedT, std::string_view>) {
+            return std::string(arg);
+        } else {
+            return std::forward<T>(arg);
+        }
+    }
 }
 
 template <typename T>
@@ -201,40 +214,27 @@ struct bind_traits<double> {
     static constexpr SQLSMALLINT sql_type = SQL_DOUBLE;
 };
 
-template <>
-struct bind_traits<std::string_view> {
-    static constexpr SQLSMALLINT c_type = SQL_C_CHAR;
-    static constexpr SQLSMALLINT sql_type = SQL_VARCHAR;
-};
-
+// FIX: Removed std::string_view traits. All string-like types are
+// converted to std::string before binding to ensure ownership.
 template <>
 struct bind_traits<std::string> {
     static constexpr SQLSMALLINT c_type = SQL_C_CHAR;
     static constexpr SQLSMALLINT sql_type = SQL_VARCHAR;
 };
 
+// FIX: Major redesign of parameter binding to fix dangling pointer bugs
+// and avoid const_cast. This function now accepts a mutable reference (T&)
+// to the data which is owned by a tuple in exec_sqlp.
 template <typename T>
 [[nodiscard]]
-inline auto bind_parameter(SQLHSTMT stmt, SQLUSMALLINT index, const T& value)
+inline auto bind_parameter(SQLHSTMT stmt, SQLUSMALLINT index, T& value)
     -> std::expected<void, std::string>
 {
     using traits = bind_traits<T>;
 
-    if constexpr (std::is_same_v<T, std::string_view>) {
-        auto buffer = std::string{value}; // owns data
-        auto len = static_cast<SQLINTEGER>(buffer.size());
-
-        if (auto ret = SQLBindParameter(
-                stmt, index, SQL_PARAM_INPUT,
-                traits::c_type, traits::sql_type,
-                len, 0,
-                buffer.data(), len, nullptr);
-            ret != SQL_SUCCESS)
-        {
-            return std::unexpected(std::format("Failed to bind string_view at index {}", index));
-        }
-
-    } else if constexpr (std::is_same_v<T, std::string>) {
+    if constexpr (std::is_same_v<T, std::string>) {
+        // value is now `std::string&`, so `.data()` returns `char*`, which is
+        // compatible with SQLBindParameter and avoids any casting.
         auto len = static_cast<SQLINTEGER>(value.size());
 
         if (auto ret = SQLBindParameter(
@@ -246,31 +246,30 @@ inline auto bind_parameter(SQLHSTMT stmt, SQLUSMALLINT index, const T& value)
         {
             return std::unexpected(std::format("Failed to bind string at index {}", index));
         }
-
     } else {
-        static_assert(std::is_trivially_copyable_v<T>, "Only trivially copyable types are allowed");
-
-        auto copy = value; // no risk of dangling
+        // For trivial types like int or double, we now bind a pointer
+        // directly to the value stored in the tuple within exec_sqlp.
+        // This fixes the dangling pointer bug caused by binding to a local copy.
         if (auto ret = SQLBindParameter(
                 stmt, index, SQL_PARAM_INPUT,
                 traits::c_type, traits::sql_type,
                 0, 0,
-                &copy, 0, nullptr);
+                &value, 0, nullptr);
             ret != SQL_SUCCESS)
         {
             return std::unexpected(std::format("Failed to bind value at index {}", index));
         }
     }
-
     return {};
 }
 
 template <typename T>
 [[nodiscard]]
-inline auto bind_parameter(SQLHSTMT stmt, SQLUSMALLINT index, const std::optional<T>& maybe)
+inline auto bind_parameter(SQLHSTMT stmt, SQLUSMALLINT index, std::optional<T>& maybe)
     -> std::expected<void, std::string>
 {
     if (maybe.has_value()) {
+        // Pass the contained value by reference to the main bind_parameter function.
         return bind_parameter(stmt, index, *maybe);
     }
 
@@ -291,9 +290,10 @@ inline auto bind_parameter(SQLHSTMT stmt, SQLUSMALLINT index, const std::optiona
     return {};
 }
 
+// FIX: Accepts a mutable tuple reference to allow getting mutable pointers to its elements.
 template <std::size_t... Is, typename... Args>
 [[nodiscard]]
-inline auto bind_all(SQLHSTMT stmt, std::index_sequence<Is...>, const std::tuple<Args...>& params)
+inline auto bind_all(SQLHSTMT stmt, std::index_sequence<Is...>, std::tuple<Args...>& params)
     -> std::expected<void, std::string>
 {
     auto result = std::expected<void, std::string>{};
@@ -301,6 +301,7 @@ inline auto bind_all(SQLHSTMT stmt, std::index_sequence<Is...>, const std::tuple
 
     (void)(([&] {
         if (!success) return;
+        // std::get on a mutable tuple reference returns a mutable reference to the element.
         if (auto bound = bind_parameter(stmt, static_cast<SQLUSMALLINT>(Is + 1), std::get<Is>(params));
             !bound)
         {
@@ -316,7 +317,7 @@ namespace sql
 {
 	using record    = std::unordered_map<std::string, std::string, util::string_hash, std::equal_to<>>;
 	using recordset = std::vector<record>;
-	
+
 	std::string get_json_response(const std::string& dbname, const std::string &sql);
 	std::string get_json_response_rs(const std::string& dbname, const std::string &sql, bool useDataPrefix=true, const std::string &prefixName="data");
 	std::string get_json_response_rs(const std::string& dbname, const std::string &sql, const std::vector<std::string> &varNames, const std::string &prefixName="data");
@@ -333,7 +334,6 @@ namespace sql
 	{
 		auto& db = sql::detail::getdb(dbname);
 
-		// Create mutable copy of SQL query (avoids unsafe cast)
 		std::string query_buffer{sql};
 
 		if (const SQLRETURN prep_ret = SQLPrepare(db.hstmt,
@@ -344,7 +344,10 @@ namespace sql
 			return std::unexpected(std::format("SQLPrepare failed for query: {}", sql));
 		}
 
-		const auto args_tuple = std::make_tuple(std::forward<Args>(args)...);
+        // FIX: Create a mutable tuple of owned data. String-like types are converted
+        // to std::string to guarantee their lifetime. This tuple now manages the
+        // lifetime of all parameter data.
+        auto args_tuple = std::make_tuple(detail::transform_arg_for_binding(std::forward<Args>(args))...);
 
 		if (const auto bind_result = bind_all(db.hstmt, std::index_sequence_for<Args...>{}, args_tuple);
 			!bind_result)
@@ -367,7 +370,6 @@ namespace sql
 
 		return {};
 	}
-
 }
 
 #endif /* SQLODBC_H_ */
