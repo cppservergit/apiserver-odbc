@@ -186,7 +186,6 @@ namespace sql::detail
 	}
 }
 
-
 template <typename T>
 struct bind_traits;
 
@@ -214,7 +213,6 @@ struct bind_traits<std::string> {
     static constexpr SQLSMALLINT sql_type = SQL_VARCHAR;
 };
 
-// --- Bind a Single Parameter ---
 template <typename T>
 [[nodiscard]]
 inline auto bind_parameter(SQLHSTMT stmt, SQLUSMALLINT index, const T& value)
@@ -223,8 +221,8 @@ inline auto bind_parameter(SQLHSTMT stmt, SQLUSMALLINT index, const T& value)
     using traits = bind_traits<T>;
 
     if constexpr (std::is_same_v<T, std::string_view>) {
-        std::string buffer{value}; // Safe mutable copy
-        const auto len = static_cast<SQLINTEGER>(buffer.size());
+        std::string buffer{value}; // Safe writable copy
+        const SQLINTEGER len = static_cast<SQLINTEGER>(buffer.size());
 
         if (const SQLRETURN ret = SQLBindParameter(
                 stmt, index, SQL_PARAM_INPUT,
@@ -237,7 +235,7 @@ inline auto bind_parameter(SQLHSTMT stmt, SQLUSMALLINT index, const T& value)
         }
 
     } else if constexpr (std::is_same_v<T, std::string>) {
-        const auto len = static_cast<SQLINTEGER>(value.size());
+        const SQLINTEGER len = static_cast<SQLINTEGER>(value.size());
 
         if (const SQLRETURN ret = SQLBindParameter(
                 stmt, index, SQL_PARAM_INPUT,
@@ -250,11 +248,13 @@ inline auto bind_parameter(SQLHSTMT stmt, SQLUSMALLINT index, const T& value)
         }
 
     } else {
+        void* value_ptr = const_cast<void*>(static_cast<const void*>(&value)); // Safe for input-only
+
         if (const SQLRETURN ret = SQLBindParameter(
                 stmt, index, SQL_PARAM_INPUT,
                 traits::c_type, traits::sql_type,
                 0, 0,
-                static_cast<const void*>(&value), 0, nullptr);
+                value_ptr, 0, nullptr);
             ret != SQL_SUCCESS)
         {
             return std::unexpected(std::format("Failed to bind value at index {}", index));
@@ -264,7 +264,6 @@ inline auto bind_parameter(SQLHSTMT stmt, SQLUSMALLINT index, const T& value)
     return {};
 }
 
-// --- Bind an Optional Parameter ---
 template <typename T>
 [[nodiscard]]
 inline auto bind_parameter(SQLHSTMT stmt, SQLUSMALLINT index, const std::optional<T>& maybe)
@@ -291,7 +290,6 @@ inline auto bind_parameter(SQLHSTMT stmt, SQLUSMALLINT index, const std::optiona
     return {};
 }
 
-// --- Bind All Parameters from Tuple ---
 template <std::size_t... Is, typename... Args>
 [[nodiscard]]
 inline auto bind_all(SQLHSTMT stmt, std::index_sequence<Is...>, const std::tuple<Args...>& params)
@@ -302,18 +300,16 @@ inline auto bind_all(SQLHSTMT stmt, std::index_sequence<Is...>, const std::tuple
 
     (void)(([&]() {
         if (!success) return;
-        if (const auto ret = bind_parameter(stmt, static_cast<SQLUSMALLINT>(Is + 1), std::get<Is>(params));
-            !ret)
+        if (const auto bound = bind_parameter(stmt, static_cast<SQLUSMALLINT>(Is + 1), std::get<Is>(params));
+            !bound)
         {
-            result = std::unexpected(ret.error());
+            result = std::unexpected(bound.error());
             success = false;
         }
     }()), ...);
 
     return result;
 }
-
-
 
 namespace sql
 {
@@ -336,32 +332,34 @@ namespace sql
 	{
 		auto& db = sql::detail::getdb(dbname);
 
-		const SQLRETURN prep_ret = SQLPrepare(
-			db.hstmt,
-			reinterpret_cast<SQLCHAR*>(const_cast<char*>(sql.data())),
-			SQL_NTS);
+		// Create mutable copy of SQL query (avoids unsafe cast)
+		std::string query_buffer{sql};
 
-		if (prep_ret != SQL_SUCCESS && prep_ret != SQL_SUCCESS_WITH_INFO) {
-			return std::unexpected("SQLPrepare failed for query: \"" + std::string(sql) + "\"");
+		if (const SQLRETURN prep_ret = SQLPrepare(db.hstmt,
+												  reinterpret_cast<SQLCHAR*>(query_buffer.data()),
+												  SQL_NTS);
+			prep_ret != SQL_SUCCESS && prep_ret != SQL_SUCCESS_WITH_INFO)
+		{
+			return std::unexpected(std::format("SQLPrepare failed for query: {}", sql));
 		}
 
-		// ?? Store arguments by value for lifetime safety
 		const auto args_tuple = std::make_tuple(std::forward<Args>(args)...);
 
-		if (auto bind_result = bind_all(db.hstmt, std::index_sequence_for<Args...>{}, args_tuple); !bind_result) {
+		if (const auto bind_result = bind_all(db.hstmt, std::index_sequence_for<Args...>{}, args_tuple);
+			!bind_result)
+		{
 			return std::unexpected(bind_result.error());
 		}
 
-		// ?? Execute
-		const SQLRETURN exec_ret = SQLExecute(db.hstmt);
-		if (exec_ret != SQL_SUCCESS && exec_ret != SQL_SUCCESS_WITH_INFO) {
-			auto [error_code, sqlstate, error_msg] = sql::detail::get_error_info(db.henv, db.hdbc, db.hstmt);
+		if (const SQLRETURN exec_ret = SQLExecute(db.hstmt);
+			exec_ret != SQL_SUCCESS && exec_ret != SQL_SUCCESS_WITH_INFO)
+		{
+			const auto [error_code, sqlstate, error_msg] = sql::detail::get_error_info(db.henv, db.hdbc, db.hstmt);
 			return std::unexpected(std::format(
 				"SQLExecute failed for query: {} with code {} sqlstate {} and error {}",
 				sql, error_code, sqlstate, error_msg));
 		}
 
-		// ?? Final cleanup
 		SQLFreeStmt(db.hstmt, SQL_CLOSE);
 		SQLFreeStmt(db.hstmt, SQL_UNBIND);
 		SQLFreeStmt(db.hstmt, SQL_RESET_PARAMS);
