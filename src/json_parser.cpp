@@ -20,7 +20,7 @@ json_parser::json_parser(std::string_view json_str) {
     // the required signature for a std::unique_ptr deleter.
     auto* tok = json_tokener_new();
     if (!tok) {
-        throw std::bad_alloc{};
+        throw parsing_error("json_parser() - cannot allocate memory");
     }
 
     obj_ = json_tokener_parse_ex(tok, json_str.data(), static_cast<int>(json_str.size()));
@@ -65,10 +65,10 @@ json_parser& json_parser::operator=(json_parser&& other) noexcept {
     return *this;
 }
 
-std::string json_parser::build(const std::map<std::string, std::string>& data) {
+std::string json_parser::build(const std::map<std::string, std::string, std::less<>>& data) {
     auto* obj = json_object_new_object();
     if (!obj) {
-        throw std::bad_alloc{};
+        throw parsing_error("build() - cannot allocate memory");
     }
     // Use a unique_ptr for exception safety during the build process.
     // It ensures json_object_put is called even if an exception is thrown.

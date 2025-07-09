@@ -60,7 +60,7 @@ public:
      * @throws json::output_error if building the JSON object fails.
      * @throws std::bad_alloc if memory allocation fails.
      */
-    [[nodiscard]] static std::string build(const std::map<std::string, std::string>& data);
+    [[nodiscard]] static std::string build(const std::map<std::string, std::string, std::less<>>& data);
 
     /**
      * @brief Retrieves a string value for a given key.

@@ -236,7 +236,6 @@ namespace jwt
 		static jwt_config config;
 		const time_t now {std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()) + config.duration}; 
 		const std::string json_header {R"({"alg":"HS256","typ":"JWT"})"};
-		//const std::string json_payload {std::format(R"({{"sid":"{}","login":"{}","mail":"{}","roles":"{}","exp":{}}})", sessionid, username, mail, roles, now)};
 		const std::string json_payload = std::format(
 			R"({{"sid":"{}","login":"{}","mail":"{}","roles":"{}","exp":{}}})",
 			sessionid,
