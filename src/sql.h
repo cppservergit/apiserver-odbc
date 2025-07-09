@@ -221,10 +221,10 @@ inline auto bind_parameter(SQLHSTMT stmt, SQLUSMALLINT index, const T& value)
     using traits = bind_traits<T>;
 
     if constexpr (std::is_same_v<T, std::string_view>) {
-        std::string buffer{value}; // Safe writable copy
-        const SQLINTEGER len = static_cast<SQLINTEGER>(buffer.size());
+        auto buffer = std::string{value}; // owns data
+        auto len = static_cast<SQLINTEGER>(buffer.size());
 
-        if (const SQLRETURN ret = SQLBindParameter(
+        if (auto ret = SQLBindParameter(
                 stmt, index, SQL_PARAM_INPUT,
                 traits::c_type, traits::sql_type,
                 len, 0,
@@ -235,26 +235,27 @@ inline auto bind_parameter(SQLHSTMT stmt, SQLUSMALLINT index, const T& value)
         }
 
     } else if constexpr (std::is_same_v<T, std::string>) {
-        const SQLINTEGER len = static_cast<SQLINTEGER>(value.size());
+        auto len = static_cast<SQLINTEGER>(value.size());
 
-        if (const SQLRETURN ret = SQLBindParameter(
+        if (auto ret = SQLBindParameter(
                 stmt, index, SQL_PARAM_INPUT,
                 traits::c_type, traits::sql_type,
                 len, 0,
-                const_cast<char*>(value.data()), len, nullptr);
+                value.data(), len, nullptr);
             ret != SQL_SUCCESS)
         {
             return std::unexpected(std::format("Failed to bind string at index {}", index));
         }
 
     } else {
-        void* value_ptr = const_cast<void*>(static_cast<const void*>(&value)); // Safe for input-only
+        static_assert(std::is_trivially_copyable_v<T>, "Only trivially copyable types are allowed");
 
-        if (const SQLRETURN ret = SQLBindParameter(
+        auto copy = value; // no risk of dangling
+        if (auto ret = SQLBindParameter(
                 stmt, index, SQL_PARAM_INPUT,
                 traits::c_type, traits::sql_type,
                 0, 0,
-                value_ptr, 0, nullptr);
+                &copy, 0, nullptr);
             ret != SQL_SUCCESS)
         {
             return std::unexpected(std::format("Failed to bind value at index {}", index));
@@ -274,9 +275,9 @@ inline auto bind_parameter(SQLHSTMT stmt, SQLUSMALLINT index, const std::optiona
     }
 
     using traits = bind_traits<T>;
-    SQLLEN null_indicator = SQL_NULL_DATA;
+    auto null_indicator = SQL_NULL_DATA;
 
-    if (const SQLRETURN ret = SQLBindParameter(
+    if (auto ret = SQLBindParameter(
             stmt, index, SQL_PARAM_INPUT,
             SQL_C_DEFAULT, traits::sql_type,
             0, 0,
@@ -295,12 +296,12 @@ template <std::size_t... Is, typename... Args>
 inline auto bind_all(SQLHSTMT stmt, std::index_sequence<Is...>, const std::tuple<Args...>& params)
     -> std::expected<void, std::string>
 {
-    std::expected<void, std::string> result{};
-    bool success = true;
+    auto result = std::expected<void, std::string>{};
+    auto success = true;
 
-    (void)(([&]() {
+    (void)(([&] {
         if (!success) return;
-        if (const auto bound = bind_parameter(stmt, static_cast<SQLUSMALLINT>(Is + 1), std::get<Is>(params));
+        if (auto bound = bind_parameter(stmt, static_cast<SQLUSMALLINT>(Is + 1), std::get<Is>(params));
             !bound)
         {
             result = std::unexpected(bound.error());
