@@ -738,31 +738,31 @@ namespace http
 		logger::log(source, level, replace_params(this, msg), get_header("x-request-id"));
 	}
 
-	void request::send_mail(const std::string& to, const std::string& subject, const std::string& body)
+	void request::send_mail(std::string& to, std::string& subject, std::string& body)
 	{
-		send_mail(to, "", subject, body, "", "");
+		std::string cc;
+		std::string att;
+		std::string attfn;
+		send_mail(to, cc, subject, body, att, attfn);
 	}
 
-	void request::send_mail(const std::string& to, const std::string& cc, const std::string& subject, const std::string& body)
+	void request::send_mail(std::string& to, std::string& cc, std::string& subject, std::string& body)
 	{
-		send_mail(to, cc, subject, body, "", "");
+		std::string att;
+		std::string attfn;
+		send_mail(to, cc, subject, body, att, attfn);
 	}
 
-	void request::send_mail(const std::string& to, const std::string& cc, const std::string& subject, const std::string& body, 
-		const std::string& attachment, const std::string& attachment_filename)
+	void request::send_mail(std::string& to, std::string& cc, std::string& subject, std::string& body, 
+		std::string& attachment, std::string& attachment_filename)
 	{
 		auto mail_to = to;
 		auto mail_body {get_mail_body(this, body)};
 		auto x_request_id {get_header("x-request-id")};
 		[[maybe_unused]] auto task = std::async(std::launch::async, 
 			[
-				to_ = std::move(mail_to), 
-				cc_ = std::move(cc), 
-				subject_ = std::move(subject), 
-				body_ = std::move(mail_body), 
-				attachment_ = std::move(attachment), 
-				attachment_filename_ = std::move(attachment_filename),
-				x_request_id_ = std::move(x_request_id)
+				to_ = std::move(mail_to), cc_ = std::move(cc), subject_ = std::move(subject), body_ = std::move(mail_body), 
+				attachment_ = std::move(attachment), attachment_filename_ = std::move(attachment_filename),	x_request_id_ = std::move(x_request_id)
 			]() 
 			{
  				smtp::mail m(env::get_str("CPP_MAIL_SERVER"), env::get_str("CPP_MAIL_USER"), env::get_str("CPP_MAIL_PWD"));

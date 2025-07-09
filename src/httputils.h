@@ -26,6 +26,7 @@
 #include <concepts>
 #include <charconv>
 #include <chrono>
+#include <utility>
 #include <sys/socket.h>
 #include <uuid/uuid.h>
 #include "util.h"
@@ -49,15 +50,16 @@ namespace http
 	
 	inline std::ostream& operator<<(std::ostream& os, status s) {
 		using namespace std::string_view_literals;
+		using enum status;
 		switch (s) {
-			case status::ok:                 return os << "200"sv;
-			case status::no_content:         return os << "204"sv;
-			case status::bad_request:        return os << "400"sv;
-			case status::unauthorized:       return os << "401"sv;
-			case status::forbidden:          return os << "403"sv;
-			case status::not_found:          return os << "404"sv;
-			case status::method_not_allowed: return os << "405"sv;
-			default:                         return os << "Unknown Status";
+			case ok:                 return os << "200"sv;
+			case no_content:         return os << "204"sv;
+			case bad_request:        return os << "400"sv;
+			case unauthorized:       return os << "401"sv;
+			case forbidden:          return os << "403"sv;
+			case not_found:          return os << "404"sv;
+			case method_not_allowed: return os << "405"sv;
+			default: return os << "Unknown Status";
 		}
 	}
 	
@@ -317,9 +319,9 @@ namespace http
 		void check_security(const std::vector<std::string>& roles = {});
 		void log(std::string_view source, std::string_view level, const std::string& msg) noexcept;
 		
-		void send_mail(const std::string& to, const std::string& subject, const std::string& body);
-		void send_mail(const std::string& to, const std::string& cc, const std::string& subject, const std::string& body);
-		void send_mail(const std::string& to, const std::string& cc, const std::string& subject, const std::string& body, const std::string& attachment, const std::string& attachment_filename);
+		void send_mail(std::string& to, std::string& subject, std::string& body);
+		void send_mail(std::string& to, std::string& cc, std::string& subject, std::string& body);
+		void send_mail(std::string& to, std::string& cc, std::string& subject, std::string& body, std::string& attachment, std::string& attachment_filename);
 		
 		std::string_view get_body() const noexcept;
 
@@ -344,9 +346,9 @@ namespace http
 
 template <>
 struct std::formatter<http::status, char> {
-    constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+    constexpr auto parse(const std::format_parse_context& ctx) const { return ctx.begin(); }
     auto format(http::status s, std::format_context& ctx) const {
-        return std::format_to(ctx.out(), "{}", static_cast<int>(s));
+        return std::format_to(ctx.out(), "{}", std::to_underlying(s));
     }
 };
 
