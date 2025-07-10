@@ -44,6 +44,10 @@ public:
         }
     }
 
+	void set(int fd) {
+		m_fd = fd;
+	}
+
     // --- Rule of Five: Non-copyable, but movable ---
     file_descriptor(const file_descriptor&) = delete;
     file_descriptor& operator=(const file_descriptor&) = delete;

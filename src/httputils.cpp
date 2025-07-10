@@ -1,6 +1,7 @@
 #include "httputils.h"
 #include <utility>
 #include <future>
+#include "async.hpp"
 
 namespace
 {
@@ -759,7 +760,7 @@ namespace http
 		auto mail_to = to;
 		auto mail_body {get_mail_body(this, body)};
 		auto x_request_id {get_header("x-request-id")};
-		[[maybe_unused]] auto task = std::async(std::launch::async, 
+		util::async_launch("Sending email...", 
 			[
 				to_ = std::move(mail_to), cc_ = std::move(cc), subject_ = std::move(subject), body_ = std::move(mail_body), 
 				attachment_ = std::move(attachment), attachment_filename_ = std::move(attachment_filename),	x_request_id_ = std::move(x_request_id)

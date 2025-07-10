@@ -133,7 +133,7 @@ namespace {
 }
 
 // --- Global Constants ---
-const char SERVER_VERSION[] = "API-Server++ v1.4.2";
+const char SERVER_VERSION[] = "API-Server++ v1.4.3";
 const char* const LOGGER_SRC {"server"};
 
 // --- Free Functions (Workers and Helpers) ---
@@ -185,7 +185,7 @@ server::webapi::webapi(
 : description{std::move(_description)}, verb{_verb}, rules{std::move(_rules)}, 
   roles{std::move(_roles)}, fn{std::move(_fn)}, is_secure{_is_secure} {}
 
-server::server() : 	m_signal{get_signalfd()}, 
+server::server() :	m_signal{get_signalfd()},
 					pod_name{get_pod_name()},
 					server_start_date{util::current_timestamp()},
 					ALLOWED_ORIGINS{parse_allowed_origins(env::get_str("CPP_ALLOW_ORIGINS"))}
@@ -755,7 +755,7 @@ void server::start() {
     print_server_info();
     const auto pool_size {env::pool_size()};
     const auto port {env::port()};
-
+	
     m_stops.resize(pool_size);
     for (int i = 0; i < pool_size; i++) {
         m_stops[i] = std::stop_source();
