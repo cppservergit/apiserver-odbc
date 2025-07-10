@@ -4,7 +4,7 @@ DATE = $(shell printf '%(%Y%m%d)T')
 CC = g++
 CC_OPTS = -Wall -Wextra -O2 -std=c++23 -pthread -flto=4 -march=x86-64 -mtune=intel
 CC_LIBS = -lodbc -lcurl -lcrypto -luuid -ljson-c -loath
-CC_OBJS = env.o logger.o json_parser.o jwt.o httputils.o email.o pkeyutil.o odbcutil.o http_client.o sql.o login.o server.o util.o main.o
+CC_OBJS = env.o logger.o json_parser.o jwt.o httputils.o async.o email.o pkeyutil.o odbcutil.o http_client.o sql.o login.o server.o util.o main.o
 
 .PHONY: all clean clear_screen
 
@@ -36,6 +36,9 @@ odbcutil.o: src/odbcutil.cpp src/odbcutil.h
 
 email.o: src/email.cpp src/email.h
 	$(CC) $(CC_OPTS) -c src/email.cpp
+
+async.o: src/async.cpp src/async.hpp
+	$(CC) $(CC_OPTS) -c src/async.cpp
 
 httputils.o: src/httputils.cpp src/httputils.h
 	$(CC) $(CC_OPTS) -c src/httputils.cpp
